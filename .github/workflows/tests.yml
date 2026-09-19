@@ -9,6 +9,7 @@ jobs:
   godot-tests:
     name: Headless suite + level design check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     env:
       GODOT: ./godot

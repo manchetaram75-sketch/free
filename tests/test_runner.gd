@@ -24,6 +24,8 @@ const LEVEL_SCRIPTS: Array = [
 	preload("res://src/levels/flooded_court.gd"),
 ]
 
+const WATCHDOG_SECONDS := 120.0
+
 var checks := 0
 var failures: Array[String] = []
 var _current := ""
@@ -54,6 +56,7 @@ class TestWorld:
 func _ready() -> void:
 	print("Two Keepers test suite")
 	print("----------------------")
+	_start_watchdog()
 	_test_envelopes()
 	_test_tether_math()
 	_test_weights_and_costs()
@@ -67,6 +70,23 @@ func _ready() -> void:
 
 
 # --- Harness ----------------------------------------------------------------
+
+## A script error inside one of the awaited sections would otherwise leave the
+## runner waiting for frames that never come, and CI would sit there until the
+## job times out. The watchdog always ends the run, and says which section was
+## running when it stopped.
+func _start_watchdog() -> void:
+	get_tree().create_timer(WATCHDOG_SECONDS).timeout.connect(_on_watchdog)
+
+
+func _on_watchdog() -> void:
+	print("\nSUITE TIMED OUT after %.0f seconds" % WATCHDOG_SECONDS)
+	print("last section started: %s" % _current)
+	print("checks run before the stop: %d, failures: %d" % [checks, failures.size()])
+	for line in failures:
+		print("   - %s" % line)
+	get_tree().quit(2)
+
 
 func _begin(section: String) -> void:
 	_current = section

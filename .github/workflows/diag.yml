@@ -13,6 +13,7 @@ jobs:
   log:
     name: Suite log
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +27,7 @@ jobs:
 
       - name: Run suite
         run: |
-          ./godot --headless --path . res://tests/test_runner.tscn > suite.log 2>&1 || true
+          timeout 150 ./godot --headless --path . res://tests/test_runner.tscn > suite.log 2>&1 || echo "suite exited $?"
           grep -nE "DEBUG|FAIL|SCRIPT ERROR|^\[|PASS|Assertion" suite.log > interesting.log || true
           echo "suite lines: $(wc -l < suite.log) interesting lines: $(wc -l < interesting.log)"
 
