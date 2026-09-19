@@ -9,6 +9,10 @@ jobs:
   godot-tests:
     name: Headless suite + level design check
     runs-on: ubuntu-latest
+
+    env:
+      GODOT: ./godot
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,28 +28,42 @@ jobs:
         run: ./godot --headless --path . --import
 
       - name: Behavioural test suite
-        run: ./godot --headless --path . res://tests/test_runner.tscn
+        run: |
+          status=0
+          ./godot --headless --path . res://tests/test_runner.tscn > suite.log 2>&1 || status=$?
+          tail -n 80 suite.log
+          annotate() { sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::test suite: $line"; done; }
+          if [ "$status" -ne 0 ]; then
+            grep -E "FAIL|ERROR|error|Assertion|Parser|Invalid" suite.log | tail -n 40 | annotate
+          fi
+          exit "$status"
 
       - name: Level design check
         run: python3 tools/level_check.py
 
       - name: Smoke-run every garden
         run: |
-          set -e
+          failed=0
           for i in 0 1 2 3; do
             echo "--- garden $i ---"
             ./godot --headless --path . res://src/main.tscn --quit-after 240 -- --level=$i > "smoke_$i.log" 2>&1 || true
             if grep -nE "SCRIPT ERROR|ERROR:|Invalid (call|get|set|access)|Cannot" "smoke_$i.log"; then
-              echo "::error::errors while running garden $i"
-              exit 1
+              grep -nE "SCRIPT ERROR|ERROR:|Invalid (call|get|set|access)|Cannot" "smoke_$i.log" \
+                | tail -n 15 | sed 's/%/%25/g; s/\r//g' \
+                | while IFS= read -r line; do echo "::error::garden $i: $line"; done
+              failed=1
+            else
+              echo "garden $i ran clean"
             fi
-            echo "garden $i ran clean"
           done
+          exit "$failed"
 
-      - name: Upload smoke logs
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-logs
-          path: smoke_*.log
+          name: test-logs
+          path: |
+            suite.log
+            smoke_*.log
           if-no-files-found: ignore
