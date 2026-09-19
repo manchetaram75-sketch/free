@@ -58,6 +58,8 @@ var _coyote := 0.0
 var _jump_buffer := 0.0
 var _action_buffer := 0.0
 var _change_buffer := 0.0
+var _was_action_held := false
+var _was_change_held := false
 var _jumps_used := 0
 var _jump_cut_done := false
 var _was_jump_held := false
@@ -158,6 +160,10 @@ func _action_just() -> bool:
 	return Input.is_action_just_pressed(Controls.action_action(index))
 
 
+func _change_held() -> bool:
+	return Input.is_action_pressed(Controls.change_action(index))
+
+
 func _jump_just() -> bool:
 	return Input.is_action_just_pressed(Controls.jump_action(index))
 
@@ -166,12 +172,25 @@ func _jump_held() -> bool:
 	return Input.is_action_pressed(Controls.jump_action(index))
 
 
-## Taps are buffered for a moment, the same way jumps are: a press that lands
-## between two physics frames still counts, which is what makes lifting and
-## tethering feel reliable rather than frame-perfect.
+## Taps are buffered for a moment, the same way jumps are, so a press that
+## lands between two physics frames still counts. The rising edge is detected
+## from the held state rather than from is_action_just_pressed(), because the
+## engine's "just pressed" frame can fall between two of this keeper's frames -
+## and a missed edge used to root the keeper instead of lifting its partner.
 func _buffer_inputs(delta: float) -> void:
-	_action_buffer = Cfg.ACTION_BUFFER_TIME if Input.is_action_just_pressed(Controls.action_action(index)) else maxf(0.0, _action_buffer - delta)
-	_change_buffer = Cfg.ACTION_BUFFER_TIME if Input.is_action_just_pressed(Controls.change_action(index)) else maxf(0.0, _change_buffer - delta)
+	var acting := _action_held()
+	if acting and not _was_action_held:
+		_action_buffer = Cfg.ACTION_BUFFER_TIME
+	else:
+		_action_buffer = maxf(0.0, _action_buffer - delta)
+	_was_action_held = acting
+
+	var changing := _change_held()
+	if changing and not _was_change_held:
+		_change_buffer = Cfg.ACTION_BUFFER_TIME
+	else:
+		_change_buffer = maxf(0.0, _change_buffer - delta)
+	_was_change_held = changing
 
 
 func _take_action() -> bool:
