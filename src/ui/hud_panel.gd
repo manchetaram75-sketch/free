@@ -12,6 +12,9 @@ extends Control
 
 var level: LevelBase = null
 
+## TEMPORARY smoke diagnostics - removed once the headless rect error is gone.
+var _diag_frames := 0
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -19,6 +22,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_diag_frames += 1
+	if _diag_frames <= 2 or _diag_frames == 60:
+		print("DIAG hud frame=", _diag_frames, " size=", size, " viewport=", get_viewport_rect().size)
 	queue_redraw()
 
 
@@ -166,12 +172,20 @@ func _draw_off_screen_markers(_font: Font, view: Vector2) -> void:
 		return
 	var transform := level.camera.get_canvas_transform()
 	var margin := 48.0
+	# The "is this keeper on screen?" test rect has to be a real rect. A degenerate
+	# viewport (a headless run, or a window dragged down to nothing) would make it
+	# negative, and Rect2 refuses to answer queries about a negative size, so the
+	# markers are simply skipped instead.
+	var inset := view - Vector2(margin, margin) * 2.0
+	if inset.x <= 0.0 or inset.y <= 0.0:
+		return
+	var on_screen := Rect2(Vector2(margin, margin), inset)
 	for index in level.pair.size():
 		var keeper := level.pair[index]
 		if not is_instance_valid(keeper):
 			continue
 		var screen := transform * keeper.center_position()
-		if Rect2(Vector2(margin, margin), view - Vector2(margin, margin) * 2.0).has_point(screen):
+		if on_screen.has_point(screen):
 			continue
 		var clamped := Vector2(clampf(screen.x, margin, view.x - margin), clampf(screen.y, margin, view.y - margin))
 		var direction := (screen - clamped)
