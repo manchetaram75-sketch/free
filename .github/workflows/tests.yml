@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  godot-tests:
+    name: Headless suite + level design check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot 4.3
+        run: |
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          mv Godot_v4.3-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Import project
+        run: ./godot --headless --path . --import
+
+      - name: Behavioural test suite
+        run: ./godot --headless --path . res://tests/test_runner.tscn
+
+      - name: Level design check
+        run: python3 tools/level_check.py
+
+      - name: Smoke-run every garden
+        run: |
+          set -e
+          for i in 0 1 2 3; do
+            echo "--- garden $i ---"
+            ./godot --headless --path . res://src/main.tscn --quit-after 240 -- --level=$i > "smoke_$i.log" 2>&1 || true
+            if grep -nE "SCRIPT ERROR|ERROR:|Invalid (call|get|set|access)|Cannot" "smoke_$i.log"; then
+              echo "::error::errors while running garden $i"
+              exit 1
+            fi
+            echo "garden $i ran clean"
+          done
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: smoke_*.log
+          if-no-files-found: ignore
