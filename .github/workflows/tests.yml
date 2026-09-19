@@ -33,9 +33,10 @@ jobs:
           # so a parse or type-inference error in any script shows up here.
           ./godot --headless --path . --editor --quit > editor.log 2>&1 || true
           if grep -qE "Parse Error|Compile Error" editor.log; then
-            grep -E "Parse Error|Compile Error|at: " editor.log | head -n 60 > compile.log
+            grep -E "Parse Error|Compile Error|GDScript::reload" editor.log | head -n 120 > compile.log
             cat compile.log
-            sed 's/%/%25/g; s/\r//g' compile.log | head -n 45 \
+            grep -E "Parse Error|Compile Error" compile.log | head -n 45 \
+              | sed 's/%/%25/g; s/\r//g' \
               | while IFS= read -r line; do echo "::error::compile: $line"; done
             exit 1
           fi

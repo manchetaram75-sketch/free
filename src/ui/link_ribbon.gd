@@ -74,7 +74,7 @@ func _draw() -> void:
 		if attuned:
 			draw_arc(keeper.center_position(), keeper.height() * 0.7, 0.0, TAU, 24, Color(Palette.GOLD, 0.25), 2.0, true)
 		else:
-			var p := keeper.center_position()
+			var p: Vector2 = keeper.center_position()
 			draw_arc(p, r * 0.25, PI * 0.85, PI * 1.15, 8, Color(Palette.DANGER, 0.4), 2.0, true)
 
 	# Tether ropes.
@@ -83,8 +83,8 @@ func _draw() -> void:
 			continue
 		if not is_instance_valid(keeper.tether_target):
 			continue
-		var from := keeper.center_position()
-		var to := keeper.tether_anchor_position()
+		var from: Vector2 = keeper.center_position()
+		var to: Vector2 = keeper.tether_anchor_position()
 		_draw_rope(from, to, keeper.reeling)
 
 
