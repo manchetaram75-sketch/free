@@ -1,8 +1,8 @@
 name: Diagnostics
 
-# TEMPORARY: reads the whole headless suite log back through the annotations
-# API, ten lines per step (GitHub caps annotations per step). Delete once the
-# suite is green.
+# TEMPORARY scaffolding: reads the headless suite log back through the
+# annotations API, ten lines per step, because CI logs are not downloadable
+# from the authoring sandbox. Delete this file once the suite is green.
 
 on:
   workflow_dispatch:
@@ -28,37 +28,69 @@ jobs:
         run: |
           ./godot --headless --path . res://tests/test_runner.tscn > suite.log 2>&1 || true
           grep -nE "DEBUG|FAIL|SCRIPT ERROR|^\[|PASS|Assertion" suite.log > interesting.log || true
-          echo "suite lines: $(wc -l < suite.log), interesting: $(wc -l < interesting.log)"
+          echo "suite lines: $(wc -l < suite.log) interesting lines: $(wc -l < interesting.log)"
 
-      - name: Log 01 (1-10)
-        run: sed -n '1,10p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 02 (11-20)
-        run: sed -n '11,20p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 03 (21-30)
-        run: sed -n '21,30p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 04 (31-40)
-        run: sed -n '31,40p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 05 (41-50)
-        run: sed -n '41,50p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 06 (51-60)
-        run: sed -n '51,60p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 07 (61-70)
-        run: sed -n '61,70p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 08 (71-80)
-        run: sed -n '71,80p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 09 (81-90)
-        run: sed -n '81,90p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 10 (91-100)
-        run: sed -n '91,100p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 11 (101-110)
-        run: sed -n '101,110p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 12 (111-120)
-        run: sed -n '111,120p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 13 (121-130)
-        run: sed -n '121,130p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 14 (131-140)
-        run: sed -n '131,140p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 15 (141-150)
-        run: sed -n '141,150p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
-      - name: Log 16 (151-160)
-        run: sed -n '151,160p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 01
+        run: |
+          sed -n '1,10p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 1 $line"; done
+      - name: Log 02
+        run: |
+          sed -n '11,20p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 11 $line"; done
+      - name: Log 03
+        run: |
+          sed -n '21,30p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 21 $line"; done
+      - name: Log 04
+        run: |
+          sed -n '31,40p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 31 $line"; done
+      - name: Log 05
+        run: |
+          sed -n '41,50p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 41 $line"; done
+      - name: Log 06
+        run: |
+          sed -n '51,60p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 51 $line"; done
+      - name: Log 07
+        run: |
+          sed -n '61,70p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 61 $line"; done
+      - name: Log 08
+        run: |
+          sed -n '71,80p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 71 $line"; done
+      - name: Log 09
+        run: |
+          sed -n '81,90p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 81 $line"; done
+      - name: Log 10
+        run: |
+          sed -n '91,100p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 91 $line"; done
+      - name: Log 11
+        run: |
+          sed -n '101,110p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 101 $line"; done
+      - name: Log 12
+        run: |
+          sed -n '111,120p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 111 $line"; done
+      - name: Log 13
+        run: |
+          sed -n '121,130p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 121 $line"; done
+      - name: Log 14
+        run: |
+          sed -n '131,140p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 131 $line"; done
+      - name: Log 15
+        run: |
+          sed -n '141,150p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 141 $line"; done
+      - name: Log 16
+        run: |
+          sed -n '151,160p' interesting.log | sed 's/%/%25/g; s/\r//g' \
+            | while IFS= read -r line; do echo "::error::log 151 $line"; done
