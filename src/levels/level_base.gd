@@ -104,9 +104,19 @@ func _physics_process(delta: float) -> void:
 	for stone in waystones:
 		stone.tick(delta)
 
+	_check_restart()
 	_step(delta)
 	_checkpoint_scan()
 	_check_goal(delta)
+
+
+## R / V sends that keeper back to the last waystone it touched. It cannot skip
+## a puzzle - it only undoes the walk since the last checkpoint you reached.
+func _check_restart() -> void:
+	for keeper in pair:
+		if Input.is_action_just_pressed(Controls.restart_action(keeper.index)):
+			keeper.teleport(keeper.spawn_point)
+			note("%s returns to the last waystone." % Forms.name_of(keeper.aspect))
 
 
 func _process(delta: float) -> void:

@@ -12,6 +12,7 @@ const GRAVITY := 1800.0
 const MAX_FALL_SPEED := 1250.0
 const COYOTE_TIME := 0.10
 const JUMP_BUFFER_TIME := 0.12
+const ACTION_BUFFER_TIME := 0.12   # taps still count this long after the press
 const JUMP_CUT := 0.45            # upward velocity kept when the jump key is released
 const GLIDE_FALL_SPEED := 168.0   # terminal fall speed while gliding (Vayu)
 const GLIDE_RESPONSE := 1500.0    # how quickly the glide speed is reached

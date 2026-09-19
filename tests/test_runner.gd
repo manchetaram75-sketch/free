@@ -282,17 +282,7 @@ func _test_keeper_physics() -> void:
 	_begin("keeper physics")
 	var world := _make_world([Rect2(0, 400, 1200, 60)])
 	var zam := _make_keeper(world, 0, Forms.ZAM, Vector2(100, 100))
-	print("DEBUG spawn y=%.1f r=%.1f h=%.1f gravity=%.1f body=%s at %s head=%s at %s layer=%d mask=%d" % [
-		zam.global_position.y, zam.radius(), zam.height(), Forms.gravity_of(Forms.ZAM),
-		str(zam._body.shape.size), str(zam._body.position),
-		str(zam._head.shape.radius), str(zam._head.position),
-		zam.collision_layer, zam.collision_mask,
-	])
-	for i in 60:
-		await get_tree().physics_frame
-		if i % 12 == 0:
-			print("DEBUG fall i=%d y=%.1f vy=%.1f floor=%s vel=%s" % [
-				i, zam.global_position.y, zam.velocity.y, str(zam.is_on_floor()), str(zam.velocity)])
+	await _frames(60)
 	_check("a falling keeper lands on the floor", zam.is_on_floor(), "y=%.1f" % zam.global_position.y)
 	_check("and lands on top of it, not inside it", absf(zam.global_position.y - 400.0) < 3.0, "y=%.1f" % zam.global_position.y)
 
@@ -308,8 +298,6 @@ func _test_keeper_physics() -> void:
 			Input.action_release("p1_jump")
 	var rise := 400.0 - peak
 	var expected := Forms.max_rise(Forms.ZAM)
-	print("DEBUG jump rest=%.1f peak=%.1f rise=%.1f expected=%.1f jumps_used=%d" % [
-		zam.global_position.y, peak, rise, expected, zam._jumps_used])
 	_check("a held jump matches the published envelope", rise > expected * 0.8 and rise <= expected * 1.15, "measured=%.1f expected=%.1f" % [rise, expected])
 
 	# A tapped jump must be *shorter*, or the jump-cut is not working.
@@ -448,6 +436,17 @@ func _test_attunement_and_reservoir() -> void:
 	_check("a fresh change starts a cooldown", zam.can_change_aspect_here() == false)
 	await _clear(world)
 
+	# --- The verbs must be reachable from the input map ----------------------
+	var key_world := _make_world([Rect2(0, 400, 1600, 60)])
+	var changer := _make_keeper(key_world, 0, Forms.ZAM, Vector2(600, 400))
+	var buddy := _make_keeper(key_world, 1, Forms.VAYU, Vector2(630, 400))
+	await _frames(20)
+	Input.action_press("p1_change")
+	await _frames(3)
+	Input.action_release("p1_change")
+	_check("the change key really changes shape", changer.aspect == Forms.VAYU,
+		"aspect=%d buddy=%s" % [changer.aspect, str(is_instance_valid(buddy))])
+
 
 func _test_levels() -> void:
 	_begin("gardens")
@@ -473,6 +472,17 @@ func _test_levels() -> void:
 			level.plates.size() + level.gates.size() + level.wells.size() + level.wind_channels.size() + level.rings.size() > 0)
 		_check("%s keeps the keepers attuned at spawn" % title, level.pair[0].attuned(), "distance too large at spawn")
 		_check("%s has room to move" % title, level.bounds.size.x > 1200.0 and level.bounds.size.y > 800.0)
+
+		# The R / V key must actually be read by the level.
+		var wanderer: Keeper = level.pair[1]
+		var waystone := wanderer.spawn_point
+		wanderer.teleport(waystone + Vector2(0, -220))
+		Input.action_press("p2_restart")
+		await _frames(3)
+		Input.action_release("p2_restart")
+		_check("%s restart key returns a keeper to its waystone" % title,
+			wanderer.global_position.distance_to(waystone) < 6.0,
+			"at %s vs %s" % [str(wanderer.global_position.round()), str(waystone.round())])
 
 		# The reservoir rule, through the real level: a full well pays for a
 		# shape change, and the change is deducted from the shared budget.

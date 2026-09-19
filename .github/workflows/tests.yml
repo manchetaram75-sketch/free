@@ -55,9 +55,11 @@ jobs:
           exit "$status"
 
       - name: Level design check
+        if: ${{ !cancelled() }}
         run: python3 tools/level_check.py
 
       - name: Smoke-run every garden
+        if: ${{ !cancelled() }}
         run: |
           failed=0
           for i in 0 1 2 3; do

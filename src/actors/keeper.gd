@@ -56,6 +56,8 @@ var _swap_cooldown := 0.0
 var _spill_grace := 0.0
 var _coyote := 0.0
 var _jump_buffer := 0.0
+var _action_buffer := 0.0
+var _change_buffer := 0.0
 var _jumps_used := 0
 var _jump_cut_done := false
 var _was_jump_held := false
@@ -164,6 +166,28 @@ func _jump_held() -> bool:
 	return Input.is_action_pressed(Controls.jump_action(index))
 
 
+## Taps are buffered for a moment, the same way jumps are: a press that lands
+## between two physics frames still counts, which is what makes lifting and
+## tethering feel reliable rather than frame-perfect.
+func _buffer_inputs(delta: float) -> void:
+	_action_buffer = Cfg.ACTION_BUFFER_TIME if Input.is_action_just_pressed(Controls.action_action(index)) else maxf(0.0, _action_buffer - delta)
+	_change_buffer = Cfg.ACTION_BUFFER_TIME if Input.is_action_just_pressed(Controls.change_action(index)) else maxf(0.0, _change_buffer - delta)
+
+
+func _take_action() -> bool:
+	if _action_buffer <= 0.0:
+		return false
+	_action_buffer = 0.0
+	return true
+
+
+func _take_change() -> bool:
+	if _change_buffer <= 0.0:
+		return false
+	_change_buffer = 0.0
+	return true
+
+
 func _move_axis() -> float:
 	return Controls.axis(index)
 
@@ -178,6 +202,7 @@ func _physics_process(delta: float) -> void:
 	_spill_flash = maxf(0.0, _spill_flash - delta)
 	_launch_timer = maxf(0.0, _launch_timer - delta)
 	_squash = move_toward(_squash, 0.0, delta * 4.0)
+	_buffer_inputs(delta)
 
 	if carried:
 		_handle_carried(delta)
@@ -334,7 +359,11 @@ func _handle_action(delta: float) -> void:
 			drop_rider(false)
 		return
 
-	if _action_just() and partner != null and _can_lift(partner):
+	if _take_change():
+		if try_change_aspect():
+			return
+
+	if partner != null and _can_lift(partner) and _take_action():
 		_lift(partner)
 		return
 
@@ -404,7 +433,7 @@ func _handle_carried(_delta: float) -> void:
 	if _jump_just():
 		jump_off_carrier()
 		return
-	if _action_just() and can_change_aspect_here():
+	if _take_change() and can_change_aspect_here():
 		try_change_aspect()
 	var seat := carrier.global_position + Vector2(0, -(carrier.height() + 2.0))
 	var desired := ((seat - global_position) * CARRY_STIFFNESS).limit_length(CARRY_MAX_SPEED)
@@ -449,10 +478,10 @@ func _handle_tether_action(_delta: float) -> void:
 		return
 	if tether_active:
 		reeling = _action_held()
-		if _action_just():
+		if _take_action():
 			tether_release()
 		return
-	if _action_just() and world != null:
+	if _take_action() and world != null:
 		world.request_tether(self)
 
 
