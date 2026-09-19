@@ -136,7 +136,7 @@ func plate_weight() -> float:
 func attuned() -> bool:
 	if world == null:
 		return true
-	var partner := world.partner_of(index)
+	var partner: Keeper = world.partner_of(index)
 	if partner == null:
 		return true
 	return global_position.distance_to(partner.center_position()) <= Settings.attunement_radius()
@@ -326,7 +326,7 @@ func _after_move(was_airborne: bool) -> void:
 # --- Actions ----------------------------------------------------------------
 
 func _handle_action(delta: float) -> void:
-	var partner := world.partner_of(index) if world != null else null
+	var partner: Keeper = world.partner_of(index) if world != null else null
 
 	if rider != null:
 		# The action button is the grip while someone is riding your shoulders.

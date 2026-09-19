@@ -10,7 +10,7 @@ extends Node2D
 
 var sky_top := Palette.SKY_TOP
 var sky_bottom := Palette.SKY_BOTTOM
-var ridge_colors := [Palette.RIDGE_FAR, Palette.RIDGE_NEAR]
+var ridge_colors: Array[Color] = [Palette.RIDGE_FAR, Palette.RIDGE_NEAR]
 var ridge_seed := 20250919
 
 var _centre := Vector2.ZERO

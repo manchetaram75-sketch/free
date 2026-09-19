@@ -27,6 +27,26 @@ jobs:
       - name: Import project
         run: ./godot --headless --path . --import
 
+      - name: Every script compiles
+        run: |
+          : > compile.log
+          for f in $(find src tests -name '*.gd' | sort); do
+            out=$(./godot --headless --path . --check-only --script "res://$f" 2>&1) || true
+            if printf '%s\n' "$out" | grep -qE "Parse Error|Compile Error|SCRIPT ERROR"; then
+              {
+                echo "== $f =="
+                printf '%s\n' "$out" | grep -E "Parse Error|Compile Error|SCRIPT ERROR|at: "
+              } >> compile.log
+            fi
+          done
+          if [ -s compile.log ]; then
+            cat compile.log
+            sed 's/%/%25/g; s/\r//g' compile.log | head -n 45 \
+              | while IFS= read -r line; do echo "::error::compile: $line"; done
+            exit 1
+          fi
+          echo "every script compiles"
+
       - name: Behavioural test suite
         run: |
           status=0

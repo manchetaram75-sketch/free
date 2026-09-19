@@ -33,11 +33,11 @@ const DANGER := Color("b8412f")
 const PLUGGED := Color("4a4458")
 
 ## Keeper identity colours: keeper 0 = lapis, keeper 1 = ochre.
-const KEEPER_COLORS := [LAPIS, OCHRE]
-const KEEPER_LIGHT := [Color("6f96e0"), Color("e6a271")]
+const KEEPER_COLORS: Array[Color] = [LAPIS, OCHRE]
+const KEEPER_LIGHT: Array[Color] = [Color("6f96e0"), Color("e6a271")]
 
 ## Aspect accents: Zam (earth) reads as stone cyan-grey, Vayu (air) as pale gold.
-const ASPECT_ACCENT := [Color("8fb6c9"), Color("f0dda2")]
+const ASPECT_ACCENT: Array[Color] = [Color("8fb6c9"), Color("f0dda2")]
 
 
 static func keeper_color(index: int) -> Color:
