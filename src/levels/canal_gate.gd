@@ -1,3 +1,4 @@
+class_name CanalGate
 extends LevelBase
 
 ## Garden 1 - The Canal Gate (teaching garden)

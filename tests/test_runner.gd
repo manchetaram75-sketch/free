@@ -146,11 +146,7 @@ func _tunnel_heights() -> Vector2:
 	## Read straight out of canal_gate so the fixture and the garden cannot
 	## drift apart: x is the low tunnel only Vayu fits through, y is the
 	## doorway only Zam fits through.
-	var constants: Dictionary = LEVEL_SCRIPTS[0].get_script_constant_map()
-	return Vector2(
-		float(constants.get("TUNNEL_HEIGHT", 0.0)),
-		float(constants.get("DOORWAY_HEIGHT", 0.0))
-	)
+	return Vector2(float(CanalGate.TUNNEL_HEIGHT), float(CanalGate.DOORWAY_HEIGHT))
 
 
 func _test_tether_math() -> void:
