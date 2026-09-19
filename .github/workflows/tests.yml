@@ -68,7 +68,6 @@ jobs:
             ./godot --headless --path . res://src/main.tscn --quit-after 240 -- --level=$i > "smoke_$i.log" 2>&1 || true
             hits=$(grep -cE "SCRIPT ERROR|ERROR:|Invalid (call|get|set|access)|Cannot" "smoke_$i.log" || true)
             echo "garden $i: $(wc -l < "smoke_$i.log") log lines, $hits of them errors"
-            grep -n "DIAG " "smoke_$i.log" | head -n 3 || true
             if [ "$hits" -gt 0 ]; then
               failed=1
               # Count the distinct errors, keeping the engine's own "at: ..."
@@ -80,13 +79,10 @@ jobs:
               {
                 echo "garden $i: $hits error lines"
                 head -n 4 "smoke_$i.summary"
-                grep -n "DIAG " "smoke_$i.log" | head -n 3
               } >> smoke_summary.txt
               # At most two annotations per garden (GitHub keeps ten per step).
               head -n 2 "smoke_$i.summary" | sed 's/^ *//' \
                 | while IFS= read -r line; do echo "::error::garden $i: $line"; done
-              grep "DIAG " "smoke_$i.log" | tail -n 1 \
-                | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::garden $i: $line"; done
             else
               echo "garden $i ran clean"
               echo "garden $i: clean" >> smoke_summary.txt

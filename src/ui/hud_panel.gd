@@ -12,9 +12,6 @@ extends Control
 
 var level: LevelBase = null
 
-## TEMPORARY smoke diagnostics - removed once the headless rect error is gone.
-var _diag_frames := 0
-
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -22,9 +19,6 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_diag_frames += 1
-	if _diag_frames <= 2 or _diag_frames == 60:
-		print("DIAG hud frame=", _diag_frames, " size=", size, " viewport=", get_viewport_rect().size)
 	queue_redraw()
 
 

@@ -380,12 +380,7 @@ func _test_carry_and_launch() -> void:
 	await _frames(30)
 
 	Input.action_press("p1_action")
-	for i in 5:
-		await get_tree().physics_frame
-		print("DEBUG act i=%d held=%s just=%s buf=%.3f rooted=%s rider=%s floor=%s can_lift=%s" % [
-			i, str(zam._action_held()), str(zam._action_just()), zam._action_buffer,
-			str(zam.rooted), str(zam.rider), str(zam.is_on_floor()), str(zam._can_lift(vayu)),
-		])
+	await _frames(5)
 	_check("the sturdy keeper can lift the swift one", zam.rider == vayu and vayu.carried, "rider=%s" % str(zam.rider))
 	await _frames(20)
 	_check("the rider rides above the carrier's head", vayu.global_position.y < zam.global_position.y - Cfg.SHOULDER_WIDTH)
