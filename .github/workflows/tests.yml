@@ -29,17 +29,11 @@ jobs:
 
       - name: Every script compiles
         run: |
-          : > compile.log
-          for f in $(find src tests -name '*.gd' | sort); do
-            out=$(./godot --headless --path . --check-only --script "res://$f" 2>&1) || true
-            if printf '%s\n' "$out" | grep -qE "Parse Error|Compile Error|SCRIPT ERROR"; then
-              {
-                echo "== $f =="
-                printf '%s\n' "$out" | grep -E "Parse Error|Compile Error|SCRIPT ERROR|at: "
-              } >> compile.log
-            fi
-          done
-          if [ -s compile.log ]; then
+          # The editor scan loads the whole project with the autoloads registered,
+          # so a parse or type-inference error in any script shows up here.
+          ./godot --headless --path . --editor --quit > editor.log 2>&1 || true
+          if grep -qE "Parse Error|Compile Error" editor.log; then
+            grep -E "Parse Error|Compile Error|at: " editor.log | head -n 60 > compile.log
             cat compile.log
             sed 's/%/%25/g; s/\r//g' compile.log | head -n 45 \
               | while IFS= read -r line; do echo "::error::compile: $line"; done
