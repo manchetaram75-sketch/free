@@ -47,7 +47,7 @@ var tether_target: Node2D = null
 var tether_rest := Cfg.TETHER_REST
 var reeling := false
 var facing := 1.0
-var water_level := -1.0e9
+var water_level := INF
 var spawn_point := Vector2.ZERO
 var swaps := 0
 
@@ -112,7 +112,7 @@ func is_grounded() -> bool:
 
 
 func in_water() -> bool:
-	return global_position.y > water_level
+	return is_finite(water_level) and global_position.y > water_level
 
 
 func head_position() -> Vector2:
@@ -171,7 +171,7 @@ func _move_axis() -> float:
 # --- Physics ----------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
-	water_level = world.get_water_level() if world != null else -1.0e9
+	water_level = world.get_water_level() if world != null else INF
 	_wind = world.wind_at(center_position()) if world != null else Vector2.ZERO
 	_swap_cooldown = maxf(0.0, _swap_cooldown - delta)
 	_spill_grace = maxf(0.0, _spill_grace - delta)

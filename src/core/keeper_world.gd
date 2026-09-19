@@ -34,7 +34,9 @@ func partner_of(_index: int) -> Keeper:
 # --- Water and wind ---------------------------------------------------------
 
 func get_water_level() -> float:
-	return -1.0e9
+	## INF means "this world has no water at all" - anything finite is a real
+	## surface, so a dry garden can never be mistaken for a flooded one.
+	return INF
 
 
 func set_water_level(_y: float) -> void:

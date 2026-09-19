@@ -393,6 +393,13 @@ func _test_carry_and_launch() -> void:
 
 	Input.action_press("p1_action")
 	await _frames(3)
+	print("DEBUG carry zam_floor=%s vayu_floor=%s dist=%.1f zam_y=%.1f vayu_y=%.1f partner=%s carried=%s rooted=%s action_held=%s action_just=%s can_lift=%s" % [
+		str(zam.is_on_floor()), str(vayu.is_on_floor()),
+		zam.global_position.distance_to(vayu.global_position),
+		zam.global_position.y, vayu.global_position.y,
+		str(world.partner_of(0)), str(vayu.carried), str(vayu.rooted),
+		str(zam._action_held()), str(zam._action_just()), str(zam._can_lift(vayu)),
+	])
 	_check("the sturdy keeper can lift the swift one", zam.rider == vayu and vayu.carried, "rider=%s" % str(zam.rider))
 	await _frames(20)
 	_check("the rider rides above the carrier's head", vayu.global_position.y < zam.global_position.y - Cfg.SHOULDER_WIDTH)
