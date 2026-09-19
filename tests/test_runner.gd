@@ -37,6 +37,12 @@ class TestWorld:
 	func keepers() -> Array[Keeper]:
 		return bodies
 
+	func partner_of(index: int) -> Keeper:
+		for k in bodies:
+			if is_instance_valid(k) and k.index != index:
+				return k
+		return null
+
 	func wind_at(point: Vector2) -> Vector2:
 		var total := Vector2.ZERO
 		for child in get_children():
@@ -110,15 +116,21 @@ func _test_envelopes() -> void:
 	_check("only the swift keeper can tether", Forms.can_tether(Forms.VAYU) and not Forms.can_tether(Forms.ZAM))
 
 	var rooms := _tunnel_heights()
-	_check("the tunnel the swift keeper uses is inside the size split", rooms.x < Forms.height(Forms.VAYU) and rooms.x < Forms.height(Forms.ZAM))
-	_check("the tunnel is tall enough for the swift keeper", rooms.x > Forms.height(Forms.VAYU) * 0.9, "tunnel=%.0f" % rooms.x)
-	_check("the tunnel is far too small for the sturdy keeper", rooms.y * 0.9 > Forms.height(Forms.ZAM), "zam=%.0f" % Forms.height(Forms.ZAM))
+	_check("the low tunnel clears the swift keeper", rooms.x > Forms.height(Forms.VAYU), "tunnel=%.0f vayu=%.0f" % [rooms.x, Forms.height(Forms.VAYU)])
+	_check("the low tunnel stops the sturdy keeper", rooms.x < Forms.height(Forms.ZAM), "tunnel=%.0f zam=%.0f" % [rooms.x, Forms.height(Forms.ZAM)])
+	_check("the doorway the sturdy keeper needs clears him", rooms.y > Forms.height(Forms.ZAM), "door=%.0f zam=%.0f" % [rooms.y, Forms.height(Forms.ZAM)])
 	_check("a launched partner reaches higher than a plain double jump", Cfg.BOOST_SPEED * Cfg.BOOST_SPEED / (2.0 * Cfg.GRAVITY) > vayu * 1.5)
 
 
 func _tunnel_heights() -> Vector2:
-	## The tutorial tunnel is 44px tall; keep both numbers in one place.
-	return Vector2(44.0, 44.0)
+	## Read straight out of canal_gate so the fixture and the garden cannot
+	## drift apart: x is the low tunnel only Vayu fits through, y is the
+	## doorway only Zam fits through.
+	var constants: Dictionary = LEVEL_SCRIPTS[0].get_script_constant_map()
+	return Vector2(
+		float(constants.get("TUNNEL_HEIGHT", 0.0)),
+		float(constants.get("DOORWAY_HEIGHT", 0.0))
+	)
 
 
 func _test_tether_math() -> void:
@@ -128,7 +140,8 @@ func _test_tether_math() -> void:
 	var slack := TetherMath.spring_velocity_delta(a, Vector2.ZERO, b, Vector2.ZERO, 150.0, 26.0, 5.0, 1.0, 0.016)
 	_check("a slack rope does nothing", slack == Vector2.ZERO)
 
-	var taut := TetherMath.spring_velocity_delta(a, Vector2(-50, 0), b, Vector2.ZERO, 100.0, 26.0, 5.0, 0.5, 0.016)
+	# Rope attached at 100px, resting at 60px: A is being pulled toward B.
+	var taut := TetherMath.spring_velocity_delta(a, Vector2.ZERO, b, Vector2.ZERO, 60.0, 26.0, 5.0, 0.5, 0.016)
 	_check("a stretched rope pulls toward the anchor", taut.x > 0.0, "pull=%.3f" % taut.x)
 
 	var corrected := TetherMath.taut_correction(Vector2(-200, 0), a, b, 100.0)
@@ -176,17 +189,24 @@ func _test_input_map() -> void:
 		pads_ok = pads_ok and has_joy
 	_check("controller scheme binds both keepers", pads_ok)
 
+	# Auto must always keep the keyboard live, whatever pads are plugged in,
+	# and must never route a keeper to a wildcard joypad: a wildcard binding
+	# would hand both players the same controller.
 	Controls.set_method(Controls.Method.AUTO)
-	var auto_ok := true
-	for action in ["p1_jump", "p2_jump"]:
-		var kinds := {"key": false, "joy": false}
+	var auto_keys := true
+	for action in ["p1_jump", "p2_jump", "p1_left", "p2_left", "p1_action", "p2_action"]:
+		auto_keys = auto_keys and not _key_set(action).is_empty()
+	_check("auto scheme always keeps the keyboard live", auto_keys)
+
+	var wildcard := false
+	for action in Controls.ACTIONS:
+		if not (action.begins_with("p1_") or action.begins_with("p2_")):
+			continue
 		for event in InputMap.action_get_events(action):
-			if event is InputEventKey:
-				kinds["key"] = true
-			elif event is InputEventJoypadButton:
-				kinds["joy"] = true
-		auto_ok = auto_ok and kinds["key"] and kinds["joy"]
-	_check("auto scheme accepts keyboard and pads", auto_ok)
+			if event is InputEventJoypadButton and (event as InputEventJoypadButton).device < 0:
+				wildcard = true
+	_check("auto scheme never binds a keeper to a wildcard pad", not wildcard)
+	_check("auto scheme tracks one pad slot per keeper", Controls.pad.size() == 2)
 	Controls.set_method(Controls.Method.KEYBOARD)
 
 
@@ -246,7 +266,17 @@ func _test_keeper_physics() -> void:
 	_begin("keeper physics")
 	var world := _make_world([Rect2(0, 400, 1200, 60)])
 	var zam := _make_keeper(world, 0, Forms.ZAM, Vector2(100, 100))
-	await _frames(60)
+	print("DEBUG spawn y=%.1f r=%.1f h=%.1f gravity=%.1f body=%s at %s head=%s at %s layer=%d mask=%d" % [
+		zam.global_position.y, zam.radius(), zam.height(), Forms.gravity_of(Forms.ZAM),
+		str(zam._body.shape.size), str(zam._body.position),
+		str(zam._head.shape.radius), str(zam._head.position),
+		zam.collision_layer, zam.collision_mask,
+	])
+	for i in 60:
+		await get_tree().physics_frame
+		if i % 12 == 0:
+			print("DEBUG fall i=%d y=%.1f vy=%.1f floor=%s vel=%s" % [
+				i, zam.global_position.y, zam.velocity.y, str(zam.is_on_floor()), str(zam.velocity)])
 	_check("a falling keeper lands on the floor", zam.is_on_floor(), "y=%.1f" % zam.global_position.y)
 	_check("and lands on top of it, not inside it", absf(zam.global_position.y - 400.0) < 3.0, "y=%.1f" % zam.global_position.y)
 
@@ -262,6 +292,8 @@ func _test_keeper_physics() -> void:
 			Input.action_release("p1_jump")
 	var rise := 400.0 - peak
 	var expected := Forms.max_rise(Forms.ZAM)
+	print("DEBUG jump rest=%.1f peak=%.1f rise=%.1f expected=%.1f jumps_used=%d" % [
+		zam.global_position.y, peak, rise, expected, zam._jumps_used])
 	_check("a held jump matches the published envelope", rise > expected * 0.8 and rise <= expected * 1.15, "measured=%.1f expected=%.1f" % [rise, expected])
 
 	# A tapped jump must be *shorter*, or the jump-cut is not working.

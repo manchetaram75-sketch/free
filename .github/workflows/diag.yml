@@ -1,0 +1,64 @@
+name: Diagnostics
+
+# TEMPORARY: reads the whole headless suite log back through the annotations
+# API, ten lines per step (GitHub caps annotations per step). Delete once the
+# suite is green.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/01a0ba73-free]
+
+jobs:
+  log:
+    name: Suite log
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot 4.3
+        run: |
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q godot.zip && mv Godot_v4.3-stable_linux.x86_64 godot && chmod +x godot
+
+      - name: Import project
+        run: ./godot --headless --path . --import > import.log 2>&1 || true
+
+      - name: Run suite
+        run: |
+          ./godot --headless --path . res://tests/test_runner.tscn > suite.log 2>&1 || true
+          grep -nE "DEBUG|FAIL|SCRIPT ERROR|^\[|PASS|Assertion" suite.log > interesting.log || true
+          echo "suite lines: $(wc -l < suite.log), interesting: $(wc -l < interesting.log)"
+
+      - name: Log 01 (1-10)
+        run: sed -n '1,10p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 02 (11-20)
+        run: sed -n '11,20p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 03 (21-30)
+        run: sed -n '21,30p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 04 (31-40)
+        run: sed -n '31,40p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 05 (41-50)
+        run: sed -n '41,50p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 06 (51-60)
+        run: sed -n '51,60p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 07 (61-70)
+        run: sed -n '61,70p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 08 (71-80)
+        run: sed -n '71,80p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 09 (81-90)
+        run: sed -n '81,90p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 10 (91-100)
+        run: sed -n '91,100p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 11 (101-110)
+        run: sed -n '101,110p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 12 (111-120)
+        run: sed -n '111,120p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 13 (121-130)
+        run: sed -n '121,130p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 14 (131-140)
+        run: sed -n '131,140p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 15 (141-150)
+        run: sed -n '141,150p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done
+      - name: Log 16 (151-160)
+        run: sed -n '151,160p' interesting.log | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::log ${first}: $line"; done

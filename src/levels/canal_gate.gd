@@ -12,6 +12,10 @@ extends LevelBase
 ## chasm, and the chasm has a tether ring over it as a forgiving second route.
 
 const GROUND := 900.0
+## The low tunnel between the wall foot and the floor: Vayu's route.
+const TUNNEL_HEIGHT := 44.0
+## The gateless opening above it, which only Zam's body fits through.
+const DOORWAY_HEIGHT := 140.0
 const WALL_X := 700.0
 const CHASM_LEFT := 2120.0
 const CHASM_RIGHT := 2400.0
@@ -34,13 +38,13 @@ func _build() -> void:
 
 	# --- The wall: low tunnel for Vayu, high doorway for Zam -------------
 	add_solid(Rect2(WALL_X, 420, 60, 200), "masonry")
-	add_solid(Rect2(WALL_X, 760, 60, 96), "masonry")
+	add_solid(Rect2(WALL_X, 760, 60, GROUND - TUNNEL_HEIGHT - 760.0), "masonry")
 	# Vayu's tunnel is the 44px gap between y 856 and y 900.
 	add_decor(Vector2(830, GROUND), Vector2(40, 60), "planter")
 
 	# Zam's doorway (y 620..760) is filled by the gate until Vayu's plate
 	# is pressed.
-	add_gate(Vector2(WALL_X + 30, 690), Vector2(60, 140), "canal", Vector2(0, -140), {
+	add_gate(Vector2(WALL_X + 30, 690), Vector2(60, DOORWAY_HEIGHT), "canal", Vector2(0, -DOORWAY_HEIGHT), {
 		"carving": "canal gate",
 	})
 	add_plate(Vector2(1120, GROUND), "canal", {"weight": 1.0, "sticky": true, "label": "holds the canal gate"})

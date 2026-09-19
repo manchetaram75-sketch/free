@@ -82,7 +82,7 @@ func _on_setting_changed(key: String) -> void:
 
 
 func _apply_default_method() -> void:
-	set_method(int(Settings.default_input_method))
+	set_method(_method_id())
 
 
 func set_method(value: int) -> void:
