@@ -3,3 +3,6 @@
 export_presets.cfg
 build/
 *.tmp
+# test outputs (written by the CI workflow and local runs)
+*.log
+smoke_*.summary

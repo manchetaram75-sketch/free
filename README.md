@@ -125,6 +125,23 @@ out-reach a double jump, and that a keeper really cannot change shape when too
 far from their partner. If a designer changes a number in
 `src/core/config.gd`, both the game and the checks move together.
 
+### Continuous integration
+
+`.github/workflows/tests.yml` runs the same gates on every push, so a garden
+can never land half-built:
+
+1. **Import** - `godot --headless --path . --import` loads every resource.
+2. **Compile** - `godot --headless --path . --editor --quit` parses and
+   type-checks the whole project with the autoloads registered.
+3. **Suite** - the behavioural checks above (`130 checks`), exit code 0.
+4. **Design** - `python3 tools/level_check.py`: reachability, gaps, spawns and
+   no blocking geometry.
+5. **Smoke** - every garden boots for 240 frames with a clean log.
+
+A failing smoke run prints a deduplicated summary of the errors together with
+the engine's own `at: <call site>` line, so one annotation names the exact
+engine call that misbehaved instead of a wall of repeated lines.
+
 ---
 
 ## Project structure
