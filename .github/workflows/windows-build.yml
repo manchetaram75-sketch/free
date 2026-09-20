@@ -52,12 +52,25 @@ jobs:
           echo "--- exported files ---"
           ls -la build
           test -f build/TwoKeepers.exe
+          # The .pck is embedded in the executable, so a real build is tens of
+          # megabytes; a few hundred kilobytes would mean an empty export that
+          # would otherwise ship silently.
+          size=$(stat -c%s build/TwoKeepers.exe)
+          echo "TwoKeepers.exe is $size bytes"
+          if [ "$size" -lt 10000000 ]; then
+            echo "::error::the exported executable is only $size bytes - the game data was not embedded"
+            exit 1
+          fi
           cp tools/HOW-TO-RUN.txt build/HOW-TO-RUN.txt
 
       - name: Package the download
         run: |
           (cd build && zip -r ../TwoKeepers-Windows.zip .)
           ls -la TwoKeepers-Windows.zip
+          unzip -l TwoKeepers-Windows.zip
+          # A notice annotation, so the file list of the shipped build is
+          # readable straight from the run's summary page.
+          echo "::notice::TwoKeepers-Windows.zip contains: $(cd build && ls -1 | tr '\n' ' ') ($(stat -c%s TwoKeepers-Windows.zip) bytes)"
 
       - name: Upload the build
         uses: actions/upload-artifact@v4
