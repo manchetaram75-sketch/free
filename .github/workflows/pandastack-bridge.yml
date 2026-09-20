@@ -1,8 +1,8 @@
 name: PandaStack bridge
 
 on:
-  repository_dispatch:
-    types: [pandastack-bridge]
+  push:
+    branches: [arena/01a0bf5c-free]
 
 jobs:
   create-sandbox:
