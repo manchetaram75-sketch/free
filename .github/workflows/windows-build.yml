@@ -157,8 +157,19 @@ jobs:
       - name: Publish or refresh the release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh release view windows-build >/dev/null 2>&1 && gh release delete windows-build --yes --cleanup-tag || true
-          gh release create windows-build TwoKeepers-Windows.zip \
+          # Idempotent, and entirely through the API: this job has no checkout,
+          # because "gh release delete --cleanup-tag" would want a local git
+          # repository and fail here. Dropping release and tag first keeps the
+          # download pointing at the commit that was just verified.
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/tags/windows-build" >/dev/null 2>&1 || true
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/windows-build" >/dev/null 2>&1 || true
+          out=$(gh release create windows-build TwoKeepers-Windows.zip \
             --title "Two Keepers - Gardens of Cyrus (Windows build)" \
-            --notes "Unzip TwoKeepers-Windows.zip and run TwoKeepers.exe: one self-contained file, nothing else to install. Two players at one keyboard - keeper 1 uses A/D, Space, S and F; keeper 2 uses the arrow keys, Z, X and C. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA, and its packaged data is booted headlessly before it is published."
+            --notes "Unzip TwoKeepers-Windows.zip and run TwoKeepers.exe: one self-contained file, nothing else to install. Two players at one keyboard - keeper 1 uses A/D, Space, S and F; keeper 2 uses the arrow keys, Z, X and C. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA, and its packaged data is booted headlessly before it is published." 2>&1) || {
+            echo "$out" | tail -n 6 | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::release: $line"; done
+            exit 1
+          }
+          echo "$out"
+          echo "::notice::Windows download published: $(gh release view windows-build --json url --jq .url)"
