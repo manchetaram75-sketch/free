@@ -1,7 +1,8 @@
 name: PandaStack bridge
 
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [pandastack-bridge]
 
 jobs:
   create-sandbox:
