@@ -105,9 +105,13 @@ controls.
 The build is not code-signed, so the first run shows the Windows SmartScreen
 prompt: *More info* → *Run anyway*.
 
-CI does not publish a build until it has booted it: `windows-build.yml` exports,
-then runs `TwoKeepers.exe` headlessly under Wine for 240 frames and fails if the
-engine banner is missing or any error line appears.
+CI does not publish a build until it has booted the game *out of the pack the
+.exe carries*: `windows-build.yml` exports, then runs the engine with
+`--main-pack` — no project directory, nothing but the packaged data — in all
+four gardens, and fails if the engine banner is missing, if any error line
+appears, or if the run exits non-zero. That is the part of a Windows export
+that can really go wrong. Launching the .exe itself needs Windows, so that last
+step is the one thing no workflow here can prove.
 
 ### Exporting it yourself
 

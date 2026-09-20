@@ -1,7 +1,7 @@
 name: Windows build
 
-## Exports the game as a Windows binary, runs the exported build headlessly
-## under Wine to prove it boots, and only then publishes it as a download.
+## Exports the game as a Windows binary, boots the exported pack headlessly to
+## prove the shipped data is complete, and only then publishes the download.
 ##
 ## The 4.3 export templates are the one thing the project needs that cannot be
 ## generated from source: they are fetched from the same Godot release as the
@@ -81,60 +81,69 @@ jobs:
           path: TwoKeepers-Windows.zip
           if-no-files-found: error
 
-  wine-check:
-    name: Boot the exported build
+  pack-check:
+    name: Boot the packaged game
     needs: windows
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
+    ## The .exe is Godot's official Windows template with our exported data
+    ## embedded in it. Running the .exe itself needs Windows (or Wine, which is
+    ## not reliably installable on a hosted runner), so this job verifies the
+    ## part that can actually be wrong: the packaged data. It exports the same
+    ## pack the .exe carries, boots it *from the pack* - no project directory,
+    ## nothing but the pack - in every garden, and fails on any error line.
 
     steps:
-      - name: Download the packaged build
-        uses: actions/download-artifact@v4
-        with:
-          name: TwoKeepers-Windows
-          path: dist
+      - uses: actions/checkout@v4
 
-      - name: Unpack it exactly as a player would
+      - name: Download Godot 4.3
         run: |
-          cd dist
-          unzip -q TwoKeepers-Windows.zip
-          ls -la
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          mv Godot_v4.3-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
 
-      - name: Install Wine
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends wine64 || sudo apt-get install -y -qq --no-install-recommends wine
-          command -v wine64 || command -v wine
+      - name: Import the project
+        run: ./godot --headless --path . --import
 
-      - name: Run the game headless and read its log
+      - name: Export the pack the .exe carries
         run: |
-          WINE_BIN=$(command -v wine64 || command -v wine)
-          export WINEDEBUG=-all
-          export WINEPREFIX="$PWD/.wineprefix"
-          status=0
-          (cd dist && "$WINE_BIN" TwoKeepers.exe --headless --quit-after 240 -- --level=0) > wine.log 2>&1 || status=$?
-          echo "--- exit status $status ---"
-          head -n 40 wine.log
-          banner=$(grep -c "Godot Engine v4.3" wine.log || true)
-          errors=$(grep -cE "ERROR:|SCRIPT ERROR|Failed to load|Cannot open" wine.log || true)
-          echo "engine banner lines: $banner, error lines: $errors"
-          if [ "$banner" -eq 0 ]; then
-            echo "::error::the exported build never reached the engine banner - it did not start"
-            exit 1
+          mkdir -p build
+          ./godot --headless --path . --export-pack "Windows Desktop" build/game.pck
+          test -s build/game.pck
+          ls -la build/game.pck
+
+      - name: Boot it from the pack, with no project directory in sight
+        run: |
+          rm -rf /tmp/run && mkdir -p /tmp/run
+          cp build/game.pck /tmp/run/game.pck
+          failed=0
+          for i in 0 1 2 3; do
+            status=0
+            (cd /tmp/run && "$GITHUB_WORKSPACE/godot" --headless --main-pack game.pck --quit-after 240 -- --level=$i) > "pack_$i.log" 2>&1 || status=$?
+            banner=$(grep -c "Godot Engine v4.3" "pack_$i.log" || true)
+            errors=$(grep -cE "ERROR:|SCRIPT ERROR|Failed to load|Cannot open|Invalid (call|get|set|access)" "pack_$i.log" || true)
+            echo "garden $i: exit $status, banner $banner, errors $errors, $(wc -l < "pack_$i.log") log lines"
+            if [ "$banner" -eq 0 ] || [ "$errors" -ne 0 ] || [ "$status" -ne 0 ]; then
+              failed=1
+              grep -E "ERROR:|SCRIPT ERROR|Failed to load|Cannot open|Invalid (call|get|set|access)" "pack_$i.log" \
+                | sort | uniq -c | sort -rn | head -n 2 | sed 's/%/%25/g; s/\r//g' \
+                | while IFS= read -r line; do echo "::error::pack garden $i: $line"; done
+              if [ "$banner" -eq 0 ]; then
+                echo "::error::pack garden $i: the engine never reached its banner (exit $status)"
+              fi
+            fi
+          done
+          if [ "$failed" -eq 0 ]; then
+            echo "::notice::the exported pack booted all four gardens from the pack alone, 240 frames each, with no error lines"
           fi
-          if [ "$errors" -ne 0 ]; then
-            grep -E "ERROR:|SCRIPT ERROR|Failed to load|Cannot open" wine.log | sort | uniq -c | sort -rn | head -n 5 | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::exported build: $line"; done
-            exit 1
-          fi
-          if [ "$status" -ne 0 ]; then
-            echo "::error::the exported build exited with status $status"
-            exit 1
-          fi
-          echo "::notice::the exported TwoKeepers.exe started, ran garden 1 for 240 frames and exited cleanly"
+          exit "$failed"
 
   publish:
     name: Publish the download
-    needs: [windows, wine-check]
+    needs: [windows, pack-check]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -152,4 +161,4 @@ jobs:
           gh release view windows-build >/dev/null 2>&1 && gh release delete windows-build --yes --cleanup-tag || true
           gh release create windows-build TwoKeepers-Windows.zip \
             --title "Two Keepers - Gardens of Cyrus (Windows build)" \
-            --notes "Unzip TwoKeepers-Windows.zip and run TwoKeepers.exe: one self-contained file, nothing else to install. Two players at one keyboard - keeper 1 uses A/D, Space, S and F; keeper 2 uses the arrow keys, Z, X and C. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA, and smoke-run headlessly before it is published."
+            --notes "Unzip TwoKeepers-Windows.zip and run TwoKeepers.exe: one self-contained file, nothing else to install. Two players at one keyboard - keeper 1 uses A/D, Space, S and F; keeper 2 uses the arrow keys, Z, X and C. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA, and its packaged data is booted headlessly before it is published."
