@@ -91,11 +91,41 @@ The project renders with the GL Compatibility renderer, so it runs on integrated
 graphics and older Windows machines. The window is 1280×720 and scales to any
 window size or fullscreen resolution.
 
-### Exports to Windows
+### Download the Windows build
 
-`Project → Export → Add… → Windows Desktop`. There is nothing to install and no
-plugins or native code; the exported build is self-contained. To install a
-Godot 4.3 export template, use `Editor → Manage Export Templates`.
+Every push builds a playable Windows binary and publishes it:
+
+**<https://github.com/manchetaram75-sketch/free/releases/tag/windows-build>**
+
+Download `TwoKeepers-Windows.zip`, unzip it and run `TwoKeepers.exe`. Keep the
+two `lib*.dll` files next to the .exe (they are the ANGLE libraries that give
+the compatibility renderer a safe path on older Windows GPUs). The zip also
+contains `HOW-TO-RUN.txt` with the controls.
+
+The build is not code-signed, so the first run shows the Windows SmartScreen
+prompt: *More info* → *Run anyway*.
+
+### Exporting it yourself
+
+The project ships with a committed export preset (`export_presets.cfg`,
+"Windows Desktop", x86_64, game data embedded in the .exe), so this is all it
+takes:
+
+```bash
+godot --headless --path . --import
+godot --headless --path . --export-release "Windows Desktop" build/TwoKeepers.exe
+```
+
+Install the Godot 4.3 export templates first (`Editor → Manage Export
+Templates`), or let CI do it — `.github/workflows/windows-build.yml` downloads
+the engine and the templates, exports, zips `build/` and refreshes that release.
+There is nothing to install and no plugins or native code, so the exported build
+is self-contained.
+
+Two cosmetic gaps remain: the .exe keeps Godot's icon and file properties,
+because the preset deliberately exports with `application/modify_resources=false`
+(that skips `rcedit`, which a Linux CI runner would otherwise need Wine to run).
+Adding an `.ico` plus a rcedit step is the follow-up.
 
 ---
 

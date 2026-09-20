@@ -1,0 +1,77 @@
+name: Windows build
+
+## Exports the game as a Windows binary and publishes it as a download.
+##
+## The export templates are the one thing the project needs that cannot be
+## generated from source: they are fetched from the same Godot 4.3 release as
+## the editor. The preset in export_presets.cfg embeds the game data inside the
+## .exe (binary_format/embed_pck), so the result is one executable plus the two
+## ANGLE libraries that give the compatibility renderer a safe path on older
+## Windows GPUs.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Export the Windows build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot 4.3
+        run: |
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          mv Godot_v4.3-stable_linux.x86_64 godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Download the 4.3 export templates
+        run: |
+          curl -sSL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          unzip -q templates.tpz -d /tmp/templates
+          mv /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          ls "$HOME/.local/share/godot/export_templates/4.3.stable/" | grep -i windows
+
+      - name: Import the project
+        run: ./godot --headless --path . --import
+
+      - name: Export the release build
+        run: |
+          mkdir -p build
+          ./godot --headless --path . --export-release "Windows Desktop" build/TwoKeepers.exe
+          echo "--- exported files ---"
+          ls -la build
+          test -f build/TwoKeepers.exe
+          cp tools/HOW-TO-RUN.txt build/HOW-TO-RUN.txt
+
+      - name: Package the download
+        run: |
+          (cd build && zip -r ../TwoKeepers-Windows.zip .)
+          ls -la TwoKeepers-Windows.zip
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwoKeepers-Windows
+          path: TwoKeepers-Windows.zip
+          if-no-files-found: error
+
+      - name: Publish or refresh the download release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view windows-build >/dev/null 2>&1 && gh release delete windows-build --yes --cleanup-tag || true
+          gh release create windows-build TwoKeepers-Windows.zip \
+            --title "Two Keepers - Gardens of Cyrus (Windows build)" \
+            --notes "Unzip TwoKeepers-Windows.zip, keep the two .dll files next to TwoKeepers.exe and run it. Two players at one keyboard: A/D, Space, S and F for keeper 1; arrows, Z, X and C for keeper 2. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA."

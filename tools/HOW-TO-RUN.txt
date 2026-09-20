@@ -1,0 +1,23 @@
+Two Keepers - Gardens of Cyrus
+==============================
+
+Two players, one PC. Run TwoKeepers.exe and keep the two .dll files next to it.
+
+KEEPER 1 (sturdy)   A / D move    SPACE jump    S act    F change shape    R restart
+KEEPER 2 (swift)    arrows move   Z or UP jump  X act    C change shape    V restart
+Pads                left stick    A jump        X act    Y change          START pause
+Shared              ESC or P pause              BACKSPACE restart the garden
+
+ACT is both a tap and a hold. The sturdy keeper taps to lift a partner onto his
+shoulders and holds to root in place. The swift keeper taps to throw or release
+the tether and holds to reel in or swing.
+
+You can only change shape while the braid of light between the two keepers is
+bright, so stay close. Every shape change is paid for out of the shared garden
+well, and the well refills about three times faster when you both stand in it.
+
+A spill sends a keeper back to the last waystone, so touching one costs seconds,
+not progress.
+
+On first run Windows SmartScreen may warn about an unknown publisher: this build
+is not code-signed. Choose "More info", then "Run anyway".
