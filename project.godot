@@ -40,5 +40,10 @@ common/physics_ticks_per_second=60
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+; Native Windows OpenGL rather than the optional ANGLE path, so the exported
+; build is one self-contained .exe with no libEGL/libGLESv2 DLLs beside it.
+; Godot 4.3 defaults to this driver anyway; pinning it keeps an export from
+; silently changing what it has to ship.
+gl_compatibility/driver.windows="opengl3"
 2d/snap/snap_2d_transforms_to_pixel=false
 environment/defaults/default_clear_color=Color(0.06, 0.07, 0.09, 1)

@@ -1,13 +1,15 @@
 name: Windows build
 
-## Exports the game as a Windows binary and publishes it as a download.
+## Exports the game as a Windows binary, runs the exported build headlessly
+## under Wine to prove it boots, and only then publishes it as a download.
 ##
-## The export templates are the one thing the project needs that cannot be
-## generated from source: they are fetched from the same Godot 4.3 release as
-## the editor. The preset in export_presets.cfg embeds the game data inside the
-## .exe (binary_format/embed_pck), so the result is one executable plus the two
-## ANGLE libraries that give the compatibility renderer a safe path on older
-## Windows GPUs.
+## The 4.3 export templates are the one thing the project needs that cannot be
+## generated from source: they are fetched from the same Godot release as the
+## editor. The preset in export_presets.cfg embeds the game data inside the .exe
+## (binary_format/embed_pck), so the download is one self-contained executable.
+## It needs no ANGLE libraries because the project pins the compatibility
+## renderer to the native Windows OpenGL driver (see rendering/gl_compatibility/
+## driver.windows in project.godot).
 
 on:
   push:
@@ -79,12 +81,75 @@ jobs:
           path: TwoKeepers-Windows.zip
           if-no-files-found: error
 
-      - name: Publish or refresh the download release
-        if: github.event_name == 'push'
+  wine-check:
+    name: Boot the exported build
+    needs: windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download the packaged build
+        uses: actions/download-artifact@v4
+        with:
+          name: TwoKeepers-Windows
+          path: dist
+
+      - name: Unpack it exactly as a player would
+        run: |
+          cd dist
+          unzip -q TwoKeepers-Windows.zip
+          ls -la
+
+      - name: Install Wine
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends wine64 || sudo apt-get install -y -qq --no-install-recommends wine
+          command -v wine64 || command -v wine
+
+      - name: Run the game headless and read its log
+        run: |
+          WINE_BIN=$(command -v wine64 || command -v wine)
+          export WINEDEBUG=-all
+          export WINEPREFIX="$PWD/.wineprefix"
+          status=0
+          (cd dist && "$WINE_BIN" TwoKeepers.exe --headless --quit-after 240 -- --level=0) > wine.log 2>&1 || status=$?
+          echo "--- exit status $status ---"
+          head -n 40 wine.log
+          banner=$(grep -c "Godot Engine v4.3" wine.log || true)
+          errors=$(grep -cE "ERROR:|SCRIPT ERROR|Failed to load|Cannot open" wine.log || true)
+          echo "engine banner lines: $banner, error lines: $errors"
+          if [ "$banner" -eq 0 ]; then
+            echo "::error::the exported build never reached the engine banner - it did not start"
+            exit 1
+          fi
+          if [ "$errors" -ne 0 ]; then
+            grep -E "ERROR:|SCRIPT ERROR|Failed to load|Cannot open" wine.log | sort | uniq -c | sort -rn | head -n 5 | sed 's/%/%25/g; s/\r//g' | while IFS= read -r line; do echo "::error::exported build: $line"; done
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error::the exported build exited with status $status"
+            exit 1
+          fi
+          echo "::notice::the exported TwoKeepers.exe started, ran garden 1 for 240 frames and exited cleanly"
+
+  publish:
+    name: Publish the download
+    needs: [windows, wine-check]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download the verified build
+        uses: actions/download-artifact@v4
+        with:
+          name: TwoKeepers-Windows
+
+      - name: Publish or refresh the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view windows-build >/dev/null 2>&1 && gh release delete windows-build --yes --cleanup-tag || true
           gh release create windows-build TwoKeepers-Windows.zip \
             --title "Two Keepers - Gardens of Cyrus (Windows build)" \
-            --notes "Unzip TwoKeepers-Windows.zip, keep the two .dll files next to TwoKeepers.exe and run it. Two players at one keyboard: A/D, Space, S and F for keeper 1; arrows, Z, X and C for keeper 2. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA."
+            --notes "Unzip TwoKeepers-Windows.zip and run TwoKeepers.exe: one self-contained file, nothing else to install. Two players at one keyboard - keeper 1 uses A/D, Space, S and F; keeper 2 uses the arrow keys, Z, X and C. The zip also contains HOW-TO-RUN.txt. Built automatically from commit $GITHUB_SHA, and smoke-run headlessly before it is published."

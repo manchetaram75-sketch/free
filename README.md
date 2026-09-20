@@ -97,13 +97,17 @@ Every push builds a playable Windows binary and publishes it:
 
 **<https://github.com/manchetaram75-sketch/free/releases/tag/windows-build>**
 
-Download `TwoKeepers-Windows.zip`, unzip it and run `TwoKeepers.exe`. Keep the
-two `lib*.dll` files next to the .exe (they are the ANGLE libraries that give
-the compatibility renderer a safe path on older Windows GPUs). The zip also
-contains `HOW-TO-RUN.txt` with the controls.
+Download `TwoKeepers-Windows.zip`, unzip it and run `TwoKeepers.exe`. It is one
+self-contained file: the game data is embedded in the executable and nothing
+else has to be installed. The zip also contains `HOW-TO-RUN.txt` with the
+controls.
 
 The build is not code-signed, so the first run shows the Windows SmartScreen
 prompt: *More info* → *Run anyway*.
+
+CI does not publish a build until it has booted it: `windows-build.yml` exports,
+then runs `TwoKeepers.exe` headlessly under Wine for 240 frames and fails if the
+engine banner is missing or any error line appears.
 
 ### Exporting it yourself
 

@@ -1,7 +1,7 @@
 Two Keepers - Gardens of Cyrus
 ==============================
 
-Two players, one PC. Run TwoKeepers.exe and keep the two .dll files next to it.
+Two players, one PC. Run TwoKeepers.exe. It is a single self-contained file.
 
 KEEPER 1 (sturdy)   A / D move    SPACE jump    S act    F change shape    R restart
 KEEPER 2 (swift)    arrows move   Z or UP jump  X act    C change shape    V restart
@@ -18,6 +18,10 @@ well, and the well refills about three times faster when you both stand in it.
 
 A spill sends a keeper back to the last waystone, so touching one costs seconds,
 not progress.
+
+The game uses the GL Compatibility renderer, so it runs on integrated graphics
+and older machines. If it ever refuses to start, the machine's graphics driver
+is the thing to update.
 
 On first run Windows SmartScreen may warn about an unknown publisher: this build
 is not code-signed. Choose "More info", then "Run anyway".
