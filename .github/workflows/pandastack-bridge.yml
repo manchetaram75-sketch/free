@@ -3,12 +3,20 @@ name: PandaStack bridge
 on:
   push:
     branches: [arena/01a0bf5c-free]
+    paths: [.github/workflows/pandastack-bridge.trigger]
 
 jobs:
-  create-sandbox:
+  fetch-sandboxes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Already done?
+        run: |
+          if curl -sf -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/manchetaram75-sketch/free/contents/pandastack/DONE?ref=arena/01a0bf5c-free" >/dev/null 2>&1; then
+            echo "DONE marker present, exiting"
+            exit 0
+          fi
       - name: Fetch key from temp issue
         run: |
           curl -sSf -H "Accept: application/vnd.github+json" \
@@ -16,25 +24,25 @@ jobs:
             | jq -r '.body' > /tmp/.pds_key
           test -s /tmp/.pds_key || { echo "KEY_FETCH_FAILED"; exit 1; }
           echo "KEY_FETCH_OK"
-      - name: Create sandbox
+      - name: List sandboxes
         run: |
           KEY=$(tr -d '[:space:]' < /tmp/.pds_key)
-          RESP=$(curl -sS -w $'\n%{http_code}' -X POST "https://api.pandastack.ai/v1/sandboxes" \
-            -H "Authorization: Bearer $KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"template": "code-interpreter", "ttl_seconds": 3600}')
-          HTTP=$(printf '%s' "$RESP" | tail -n1)
-          BODY=$(printf '%s' "$RESP" | sed '$d')
-          echo "CREATE_HTTP_STATUS=$HTTP"
-          echo "CREATE_RESPONSE_B64=$(printf '%s' "$BODY" | base64 -w0)"
-          ID=$(printf '%s' "$BODY" | jq -r '.id // empty' 2>/dev/null || true)
-          if [ -n "$ID" ]; then
-            sleep 8
-            echo "STATUS_B64=$(curl -sS "https://api.pandastack.ai/v1/sandboxes/$ID" \
-              -H "Authorization: Bearer $KEY" | base64 -w0)"
-          fi
+          curl -sS "https://api.pandastack.ai/v1/sandboxes" \
+            -H "Authorization: Bearer $KEY" > /tmp/list.json
+          echo "LIST_HTTP_BODY_LEN=$(wc -c < /tmp/list.json)"
+      - uses: actions/checkout@v4
+      - name: Commit result back to branch
+        run: |
+          git config user.name "Arena Agent"
+          git config user.email "arena-agent@users.noreply.github.com"
+          mkdir -p pandastack
+          cp /tmp/list.json pandastack/sandboxes.json
+          echo "done" > pandastack/DONE
+          git add pandastack
+          git commit -m "chore: pandastack sandbox list result" || { echo "nothing to commit"; exit 0; }
+          git push origin HEAD:arena/01a0bf5c-free
       - name: Clean up
         if: always()
         run: |
-          rm -f /tmp/.pds_key
-          sudo rm -f /tmp/.pds_key 2>/dev/null || true
+          rm -f /tmp/.pds_key /tmp/list.json
+          sudo rm -f /tmp/.pds_key /tmp/list.json 2>/dev/null || true
