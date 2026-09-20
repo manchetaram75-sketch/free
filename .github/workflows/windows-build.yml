@@ -163,7 +163,14 @@ jobs:
           # because "gh release delete --cleanup-tag" would want a local git
           # repository and fail here. Dropping release and tag first keeps the
           # download pointing at the commit that was just verified.
-          gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/tags/windows-build" >/dev/null 2>&1 || true
+          #
+          # A leftover *draft* cannot be found by tag (that lookup is 404 for
+          # drafts), so anything under this tag is deleted by id or the next
+          # create fails with "a release with the same tag name already exists".
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name=="windows-build") | .id'); do
+            echo "deleting the previous release $id"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
           gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/windows-build" >/dev/null 2>&1 || true
           out=$(gh release create windows-build TwoKeepers-Windows.zip \
             --title "Two Keepers - Gardens of Cyrus (Windows build)" \
@@ -172,4 +179,10 @@ jobs:
             exit 1
           }
           echo "$out"
-          echo "::notice::Windows download published: $(gh release view windows-build --json url --jq .url)"
+          # Confirm the release really is public and really carries the build:
+          # a release that stayed a draft answers 404 here.
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/windows-build" \
+            --jq '"::notice::published \(.html_url) - draft=\(.draft) assets=\(.assets|length) bytes=\(.assets[0].size)"'; then
+            echo "::error::the release is not readable by tag - it did not publish"
+            exit 1
+          fi
