@@ -5,6 +5,9 @@ on:
     branches: [arena/01a0bf5c-free]
     paths: [.github/workflows/pandastack-bridge.trigger]
 
+permissions:
+  contents: write
+
 jobs:
   fetch-sandboxes:
     runs-on: ubuntu-latest
@@ -17,32 +20,48 @@ jobs:
             echo "DONE marker present, exiting"
             exit 0
           fi
-      - name: Fetch key from temp issue
+      - name: Fetch key + list sandboxes
+        id: main
+        continue-on-error: true
         run: |
-          curl -sSf -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/manchetaram75-sketch/free/issues/1" \
-            | jq -r '.body' > /tmp/.pds_key
-          test -s /tmp/.pds_key || { echo "KEY_FETCH_FAILED"; exit 1; }
-          echo "KEY_FETCH_OK"
-      - name: List sandboxes
+          set -x
+          {
+            curl -sSf -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/manchetaram75-sketch/free/issues/1" \
+              | jq -r '.body' > /tmp/.pds_key
+            test -s /tmp/.pds_key
+            KEY=$(tr -d '[:space:]' < /tmp/.pds_key)
+            curl -sS "https://api.pandastack.ai/v1/sandboxes" \
+              -H "Authorization: Bearer $KEY" > /tmp/list.json
+            wc -c < /tmp/list.json
+          } 2>&1 | tail -40 > /tmp/diag.txt
+          if [ -s /tmp/list.json ]; then echo "MAIN_OK"; else echo "MAIN_FAIL"; cat /tmp/diag.txt; fi
+      - name: Push result/diag back to branch
+        if: always()
         run: |
-          KEY=$(tr -d '[:space:]' < /tmp/.pds_key)
-          curl -sS "https://api.pandastack.ai/v1/sandboxes" \
-            -H "Authorization: Bearer $KEY" > /tmp/list.json
-          echo "LIST_HTTP_BODY_LEN=$(wc -c < /tmp/list.json)"
-      - uses: actions/checkout@v4
-      - name: Commit result back to branch
-        run: |
-          git config user.name "Arena Agent"
-          git config user.email "arena-agent@users.noreply.github.com"
-          mkdir -p pandastack
-          cp /tmp/list.json pandastack/sandboxes.json
-          echo "done" > pandastack/DONE
-          git add pandastack
-          git commit -m "chore: pandastack sandbox list result" || { echo "nothing to commit"; exit 0; }
-          git push origin HEAD:arena/01a0bf5c-free
+          set -x
+          {
+            rm -rf /tmp/repo
+            git clone --quiet --depth 1 --branch arena/01a0bf5c-free \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/manchetaram75-sketch/free.git" \
+              /tmp/repo
+            cd /tmp/repo
+            git config user.name "Arena Agent"
+            git config user.email "arena-agent@users.noreply.github.com"
+            mkdir -p pandastack
+            [ -s /tmp/list.json ] && { cp /tmp/list.json pandastack/sandboxes.json; echo "done" > pandastack/DONE; } || true
+            [ -s /tmp/diag.txt ] && cp /tmp/diag.txt pandastack/diag.txt || true
+            git add -A pandastack
+            git commit -m "chore: pandastack bridge result"
+            git push origin HEAD:arena/01a0bf5c-free
+          } 2>&1 | tail -60 > /tmp/pushdiag.txt
+          if ! git -C /tmp/repo rev-parse --verify HEAD >/dev/null 2>&1; then
+            echo "PUSH_STEP_FAIL"; cat /tmp/pushdiag.txt
+          else
+            echo "PUSH_STEP_OK"
+          fi
       - name: Clean up
         if: always()
         run: |
-          rm -f /tmp/.pds_key /tmp/list.json
-          sudo rm -f /tmp/.pds_key /tmp/list.json 2>/dev/null || true
+          rm -f /tmp/.pds_key /tmp/list.json /tmp/diag.txt /tmp/pushdiag.txt
+          sudo rm -f /tmp/.pds_key /tmp/list.json /tmp/diag.txt /tmp/pushdiag.txt 2>/dev/null || true
