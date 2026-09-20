@@ -1,0 +1,39 @@
+name: PandaStack bridge
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch key from temp issue
+        run: |
+          curl -sSf -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/manchetaram75-sketch/free/issues/1" \
+            | jq -r '.body' > /tmp/.pds_key
+          test -s /tmp/.pds_key || { echo "KEY_FETCH_FAILED"; exit 1; }
+          echo "KEY_FETCH_OK"
+      - name: Create sandbox
+        run: |
+          KEY=$(tr -d '[:space:]' < /tmp/.pds_key)
+          RESP=$(curl -sS -w $'\n%{http_code}' -X POST "https://api.pandastack.ai/v1/sandboxes" \
+            -H "Authorization: Bearer $KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"template": "code-interpreter", "ttl_seconds": 3600}')
+          HTTP=$(printf '%s' "$RESP" | tail -n1)
+          BODY=$(printf '%s' "$RESP" | sed '$d')
+          echo "CREATE_HTTP_STATUS=$HTTP"
+          echo "CREATE_RESPONSE_B64=$(printf '%s' "$BODY" | base64 -w0)"
+          ID=$(printf '%s' "$BODY" | jq -r '.id // empty' 2>/dev/null || true)
+          if [ -n "$ID" ]; then
+            sleep 8
+            echo "STATUS_B64=$(curl -sS "https://api.pandastack.ai/v1/sandboxes/$ID" \
+              -H "Authorization: Bearer $KEY" | base64 -w0)"
+          fi
+      - name: Clean up
+        if: always()
+        run: |
+          rm -f /tmp/.pds_key
+          sudo rm -f /tmp/.pds_key 2>/dev/null || true
