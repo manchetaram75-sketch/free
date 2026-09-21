@@ -1,0 +1,11 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# Generated previews
+web/.cache/
+deliverables/*.mp4

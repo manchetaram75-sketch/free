@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0d13" />
+  <meta name="description" content="ارزینه؛ رصد قیمت ارزها و تبدیل سریع به تومان" />
+  <title>ارزینه | نرخ ارز و تبدیلگر</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+
+    <header class="topbar">
+      <div class="brand-lockup">
+        <img class="brand-mark" src="assets/logo-mark.svg" alt="نشان ارزینه" />
+        <div>
+          <div class="brand-name">ارزینه</div>
+          <div class="brand-caption">نرخ‌یار هوشمند</div>
+        </div>
+      </div>
+      <button class="icon-button notification-button" aria-label="اعلان‌ها">
+        <span class="notification-dot"></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      </button>
+    </header>
+
+    <section class="hero-card">
+      <div class="hero-content">
+        <div class="eyebrow"><span class="live-dot"></span> به‌روزرسانی لحظه‌ای</div>
+        <h1>نبض بازار<br><span>در دستان تو</span></h1>
+        <p>قیمت ارزها را ساده و سریع دنبال کن.</p>
+        <button class="primary-button hero-action" data-view="rates">مشاهده نرخ‌ها <span>←</span></button>
+      </div>
+      <div class="hero-orbit orbit-one"></div>
+      <div class="hero-orbit orbit-two"></div>
+      <div class="hero-token token-main">$</div>
+      <div class="hero-token token-small">₿</div>
+      <div class="hero-token token-tiny">€</div>
+      <div class="hero-spark spark-one"></div>
+      <div class="hero-spark spark-two"></div>
+    </section>
+
+    <section class="market-strip" aria-label="خلاصه بازار">
+      <div class="market-strip-label"><span class="mini-pulse"></span> بازار امروز</div>
+      <div class="market-strip-value"><strong>+۲.۴٪</strong><span>روند کلی بازار</span></div>
+      <svg class="mini-chart" viewBox="0 0 112 30" fill="none" aria-hidden="true"><path d="M2 25C12 25 12 19 22 20C32 21 31 12 41 15C51 18 53 8 62 11C72 14 75 5 84 9C93 13 95 4 110 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M2 25C12 25 12 19 22 20C32 21 31 12 41 15C51 18 53 8 62 11C72 14 75 5 84 9C93 13 95 4 110 2V30H2Z" fill="url(#fill)" opacity=".2"/><defs><linearGradient id="fill" x1="55" y1="2" x2="55" y2="30"><stop stop-color="#73e6b2"/><stop offset="1" stop-color="#73e6b2" stop-opacity="0"/></linearGradient></defs></svg>
+    </section>
+
+    <div class="view view-home is-active" id="homeView">
+      <section class="section-block featured-section">
+        <div class="section-heading">
+          <div><span class="section-kicker">منتخب امروز</span><h2>ارزهای محبوب</h2></div>
+          <button class="text-button" data-view="rates">همه نرخ‌ها <span>←</span></button>
+        </div>
+        <div class="featured-grid">
+          <article class="featured-card featured-gold" data-symbol="USD">
+            <div class="featured-top"><span class="asset-icon usd-icon">$</span><span class="trend up">+۰.۸٪</span></div>
+            <div class="asset-name">دلار آمریکا <small>USD</small></div>
+            <div class="asset-price">۹۲,۴۵۰ <span>تومان</span></div>
+            <div class="sparkline gold-line"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </article>
+          <article class="featured-card featured-violet" data-symbol="BTC">
+            <div class="featured-top"><span class="asset-icon btc-icon">₿</span><span class="trend up">+۲.۴٪</span></div>
+            <div class="asset-name">بیت‌کوین <small>BTC</small></div>
+            <div class="asset-price">۱۰,۴۸۰,۰۰۰,۰۰۰ <span>تومان</span></div>
+            <div class="sparkline violet-line"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block quick-converter">
+        <div class="section-heading">
+          <div><span class="section-kicker">سریع و دقیق</span><h2>تبدیلگر ارز</h2></div>
+          <button class="round-arrow" data-view="converter" aria-label="باز کردن تبدیلگر">←</button>
+        </div>
+        <div class="converter-preview">
+          <div class="conversion-side"><span class="asset-icon usd-icon">$</span><div><small>از</small><strong>دلار آمریکا</strong></div><span class="chevron">⌄</span></div>
+          <div class="conversion-value"><span>۱</span><small>USD</small></div>
+          <div class="conversion-divider"><button class="swap-button" aria-label="جابجایی ارزها">⇄</button></div>
+          <div class="conversion-side to-side"><span class="asset-icon toman-icon">﷼</span><div><small>به</small><strong>تومان ایران</strong></div><span class="chevron">⌄</span></div>
+          <div class="conversion-value result"><span>۹۲,۴۵۰</span><small>تومان</small></div>
+        </div>
+        <button class="full-width-button" data-view="converter">شروع تبدیل <span>←</span></button>
+      </section>
+    </div>
+
+    <div class="view view-rates" id="ratesView">
+      <section class="page-heading"><span class="section-kicker">رصد لحظه‌ای</span><h1>نرخ بازار</h1><p>قیمت‌ها به تومان، آخرین بروزرسانی همین حالا</p></section>
+      <div class="search-row"><div class="search-box"><svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><input id="rateSearch" placeholder="جستجوی ارز..." aria-label="جستجوی ارز" /></div><button class="filter-button" aria-label="فیلتر">☷</button></div>
+      <div class="segmented" role="tablist"><button class="segment is-selected" data-filter="all" role="tab">همه</button><button class="segment" data-filter="fiat" role="tab">ارزها</button><button class="segment" data-filter="crypto" role="tab">دیجیتال</button></div>
+      <div class="rates-list" id="ratesList"></div>
+      <div class="last-updated"><span class="live-dot"></span> آخرین بروزرسانی: همین حالا</div>
+    </div>
+
+    <div class="view view-converter" id="converterView">
+      <section class="page-heading converter-heading"><span class="section-kicker">ساده، سریع، مطمئن</span><h1>تبدیلگر</h1><p>ارزش ارزها را به تومان محاسبه کن.</p></section>
+      <div class="converter-card">
+        <div class="field-label"><span>مقدار</span><span class="field-hint">نرخ لحظه‌ای</span></div>
+        <div class="amount-field"><input id="amountInput" value="1" inputmode="decimal" aria-label="مقدار برای تبدیل" /><span id="fromUnit">USD</span></div>
+        <button class="swap-large" id="swapCurrencies" aria-label="جابجایی مبدا و مقصد"><span>⇅</span></button>
+        <div class="currency-picker" id="fromPicker"><span class="asset-icon usd-icon" id="fromIcon">$</span><div><small>از ارز</small><strong id="fromName">دلار آمریکا</strong></div><span class="picker-code" id="fromCode">USD</span><span class="chevron">⌄</span></div>
+        <div class="currency-picker" id="toPicker"><span class="asset-icon toman-icon">﷼</span><div><small>به ارز</small><strong>تومان ایران</strong></div><span class="picker-code">IRR</span><span class="chevron">⌄</span></div>
+        <div class="converter-result"><span>ارزش تقریبی</span><strong id="conversionResult">۹۲,۴۵۰ <small>تومان</small></strong><em>۱ دلار = ۹۲,۴۵۰ تومان</em></div>
+      </div>
+      <div class="quick-amounts"><span>مقدار سریع</span><div><button data-amount="1">۱</button><button data-amount="10">۱۰</button><button data-amount="100">۱۰۰</button><button data-amount="1000">۱,۰۰۰</button></div></div>
+      <div class="rate-note"><span class="info-icon">i</span><p>نرخ‌ها از منابع معتبر بازار جمع‌آوری می‌شوند و برای معامله نهایی نیستند.</p></div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="nav-item is-active" data-view="home"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z"/></svg></span><span>خانه</span></button>
+      <button class="nav-item" data-view="rates"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M8 16v-3m4 3V8m4 8V5"/></svg></span><span>نرخ‌ها</span></button>
+      <button class="nav-item convert-nav" data-view="converter"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 7h12l-3-3m3 3-3 3M17 17H5l3 3m-3-3 3-3"/></svg></span><span>تبدیلگر</span></button>
+      <button class="nav-item" data-view="more"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span><span>بیشتر</span></button>
+    </div>
+    <div class="toast" id="toast">به‌زودی آماده می‌شود</div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
