@@ -1,56 +1,681 @@
-name: Windows Cloud RDP
+name: Ubuntu SSH via Tailscale (Full 33 Hours Persistent Workspace)
 
 on:
   workflow_dispatch:
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
-  build:
-    runs-on: windows-latest
+  session-1:
+    runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-      - name: 1. Enable Remote Desktop & Firewall
-        run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 0
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: 2. Create Admin Account
-        run: |
-          $Password = ConvertTo-SecureString "Cynet@2026" -AsPlainText -Force
-          New-LocalUser -Name "CynetAdmin" -Password $Password -PasswordNeverExpires -ErrorAction SilentlyContinue
-          Add-LocalGroupMember -Group "Administrators" -Member "CynetAdmin" -ErrorAction SilentlyContinue
-          net user runneradmin Cynet@2026
+    - name: Set Up User & Workspace
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        echo "runner:neo_tenet" | sudo chpasswd
+        sudo useradd -m -s /bin/bash Neotenet || true
+        echo "Neotenet:neo_tenet" | sudo chpasswd
+        sudo usermod -aG sudo Neotenet
+        sudo mkdir -p /home/Neotenet/workspace
+        echo "cd /home/Neotenet/workspace" | sudo tee -a /home/Neotenet/.bashrc > /dev/null
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace /home/Neotenet/.bashrc
+        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config || true
+        echo "PasswordAuthentication yes" | sudo tee /etc/ssh/sshd_config.d/99-password-auth.conf || true
+        sudo systemctl restart ssh || sudo service ssh restart || true
+        
+        # Create stop-all command with delay for proper cancellation
+        sudo bash -c "cat << 'EOF' > /usr/local/bin/stop-all
+        #!/bin/bash
+        echo 'Canceling all sessions and stopping workflow...'
+        curl -s -X POST -H 'Authorization: token $GH_TOKEN' -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/cancel'
+        sleep 4
+        sudo pkill -9 -f sleep || true
+        EOF"
+        sudo chmod +x /usr/local/bin/stop-all
 
-      - name: 3. Install & Connect Tailscale VPN
-        env:
-          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
-        run: |
-          # Download and install Tailscale silently
-          Invoke-WebRequest "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" -OutFile "C:\tailscale.msi"
-          Start-Process msiexec -ArgumentList "/i C:\tailscale.msi /quiet /norestart" -Wait
-          
-          # Connect to Tailscale network
-          Start-Sleep -Seconds 5
-          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey="$Env:TAILSCALE_AUTHKEY" --hostname="github-rdp-server"
-          
-          Start-Sleep -Seconds 8
-          
-          # Get Tailscale IP
-          $ts_ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
-          
-          Write-Host ""
-          Write-Host "==================================================" -ForegroundColor Green
-          Write-Host "  >>> RDP SERVER IS READY! <<<" -ForegroundColor Cyan
-          Write-Host "  Tailscale IP : $ts_ip" -ForegroundColor Yellow
-          Write-Host "  Username     : CynetAdmin" -ForegroundColor Yellow
-          Write-Host "  Password     : Cynet@2026" -ForegroundColor Yellow
-          Write-Host "  >> Open mstsc and connect to: $ts_ip" -ForegroundColor Magenta
-          Write-Host "==================================================" -ForegroundColor Green
+    - name: Restore Workspace Data (Initial Repo Backup)
+      run: |
+        if [ -f workspace-backup.tar.gz ]; then
+          echo "Restoring initial backup from Repository file..."
+          sudo tar -xzf workspace-backup.tar.gz -C /home/Neotenet/
+        else
+          echo "No repository backup file found, starting with empty workspace."
+        fi
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace
 
-      - name: 4. Keep Server Alive (6 Hours)
-        run: |
-          for ($i = 1; $i -le 360; $i++) {
-            Start-Sleep -Seconds 60
-            Write-Host "[$i/360] Server running..."
-          }
+    - name: Connect Tailscale
+      env:
+        TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="session1-run-${{ github.run_id }}"
+        
+        echo "در حال تثبیت شبکه Tailscale..."
+        sleep 10
+        
+        TS_IP=$(tailscale ip -4)
+        echo "=========================================="
+        echo "SSH Connection Details (Session 1):"
+        echo "IP: $TS_IP"
+        echo "User: Neotenet"
+        echo "Password: neo_tenet"
+        echo "SSH Command: ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o StrictHostKeyChecking=no Neotenet@$TS_IP"
+        echo "To stop ALL sessions type: stop-all"
+        echo "To skip to NEXT session type: touch /tmp/skip_timer"
+        echo "=========================================="
+
+    - name: Keep Alive & Live Timer (5.5 Hours)
+      run: |
+        TOTAL_SECONDS=19800
+        while [ $TOTAL_SECONDS -gt 0 ]; do
+          if [ -f /tmp/skip_timer ]; then
+            echo -e "\nSkip signal received! Ending Session 1 and saving backup..."
+            sudo rm -f /tmp/skip_timer
+            break
+          fi
+          HOURS=$((TOTAL_SECONDS / 3600))
+          MINS=$(((TOTAL_SECONDS % 3600) / 60))
+          SECS=$((TOTAL_SECONDS % 60))
+          printf "\rTime remaining in Session 1: %02d:%02d:%02d" $HOURS $MINS $SECS
+          sleep 5
+          TOTAL_SECONDS=$((TOTAL_SECONDS - 5))
+        done
+
+    - name: Backup Workspace
+      if: always()
+      run: |
+        cd /home/Neotenet
+        sudo tar -czf /tmp/workspace-backup.tar.gz workspace/ || true
+
+    - name: Upload Workspace Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace-backup-s1
+        path: /tmp/workspace-backup.tar.gz
+        retention-days: 1
+
+    - name: Cleanup Tailscale Node
+      if: always()
+      run: |
+        sudo tailscale logout || true
+
+  session-2:
+    needs: session-1
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Up User
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        echo "runner:neo_tenet" | sudo chpasswd
+        sudo useradd -m -s /bin/bash Neotenet || true
+        echo "Neotenet:neo_tenet" | sudo chpasswd
+        sudo usermod -aG sudo Neotenet
+        sudo mkdir -p /home/Neotenet/workspace
+        echo "cd /home/Neotenet/workspace" | sudo tee -a /home/Neotenet/.bashrc > /dev/null
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace /home/Neotenet/.bashrc
+        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config || true
+        echo "PasswordAuthentication yes" | sudo tee /etc/ssh/sshd_config.d/99-password-auth.conf || true
+        sudo systemctl restart ssh || sudo service ssh restart || true
+
+        sudo bash -c "cat << 'EOF' > /usr/local/bin/stop-all
+        #!/bin/bash
+        echo 'Canceling all sessions and stopping workflow...'
+        curl -s -X POST -H 'Authorization: token $GH_TOKEN' -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/cancel'
+        sleep 4
+        sudo pkill -9 -f sleep || true
+        EOF"
+        sudo chmod +x /usr/local/bin/stop-all
+
+    - name: Download Workspace Artifact
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: workspace-backup-s1
+        path: /tmp/
+
+    - name: Restore Workspace Data
+      run: |
+        if [ -f /tmp/workspace-backup.tar.gz ]; then
+          echo "Restoring backup from Session 1..."
+          sudo tar -xzf /tmp/workspace-backup.tar.gz -C /home/Neotenet/
+          sudo rm /tmp/workspace-backup.tar.gz
+        elif [ -f workspace-backup.tar.gz ]; then
+          echo "Restoring initial backup from Repository file..."
+          sudo tar -xzf workspace-backup.tar.gz -C /home/Neotenet/
+        else
+          echo "No backup file found, starting with empty workspace."
+        fi
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace
+
+    - name: Connect Tailscale
+      env:
+        TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="session2-run-${{ github.run_id }}"
+        
+        echo "در حال تثبیت شبکه Tailscale..."
+        sleep 10
+        
+        TS_IP=$(tailscale ip -4)
+        echo "=========================================="
+        echo "SSH Connection Details (Session 2):"
+        echo "IP: $TS_IP"
+        echo "User: Neotenet"
+        echo "Password: neo_tenet"
+        echo "SSH Command: ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o StrictHostKeyChecking=no Neotenet@$TS_IP"
+        echo "To stop ALL sessions type: stop-all"
+        echo "To skip to NEXT session type: touch /tmp/skip_timer"
+        echo "=========================================="
+
+    - name: Keep Alive & Live Timer (5.5 Hours)
+      run: |
+        TOTAL_SECONDS=19800
+        while [ $TOTAL_SECONDS -gt 0 ]; do
+          if [ -f /tmp/skip_timer ]; then
+            echo -e "\nSkip signal received! Ending Session 2 and saving backup..."
+            sudo rm -f /tmp/skip_timer
+            break
+          fi
+          HOURS=$((TOTAL_SECONDS / 3600))
+          MINS=$(((TOTAL_SECONDS % 3600) / 60))
+          SECS=$((TOTAL_SECONDS % 60))
+          printf "\rTime remaining in Session 2: %02d:%02d:%02d" $HOURS $MINS $SECS
+          sleep 5
+          TOTAL_SECONDS=$((TOTAL_SECONDS - 5))
+        done
+
+    - name: Backup Workspace
+      if: always()
+      run: |
+        cd /home/Neotenet
+        sudo tar -czf /tmp/workspace-backup.tar.gz workspace/ || true
+
+    - name: Upload Workspace Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace-backup-s2
+        path: /tmp/workspace-backup.tar.gz
+        retention-days: 1
+
+    - name: Cleanup Tailscale Node
+      if: always()
+      run: |
+        sudo tailscale logout || true
+
+  session-3:
+    needs: session-2
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Up User
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        echo "runner:neo_tenet" | sudo chpasswd
+        sudo useradd -m -s /bin/bash Neotenet || true
+        echo "Neotenet:neo_tenet" | sudo chpasswd
+        sudo usermod -aG sudo Neotenet
+        sudo mkdir -p /home/Neotenet/workspace
+        echo "cd /home/Neotenet/workspace" | sudo tee -a /home/Neotenet/.bashrc > /dev/null
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace /home/Neotenet/.bashrc
+        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config || true
+        echo "PasswordAuthentication yes" | sudo tee /etc/ssh/sshd_config.d/99-password-auth.conf || true
+        sudo systemctl restart ssh || sudo service ssh restart || true
+
+        sudo bash -c "cat << 'EOF' > /usr/local/bin/stop-all
+        #!/bin/bash
+        echo 'Canceling all sessions and stopping workflow...'
+        curl -s -X POST -H 'Authorization: token $GH_TOKEN' -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/cancel'
+        sleep 4
+        sudo pkill -9 -f sleep || true
+        EOF"
+        sudo chmod +x /usr/local/bin/stop-all
+
+    - name: Download Workspace Artifact
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: workspace-backup-s2
+        path: /tmp/
+
+    - name: Restore Workspace Data
+      run: |
+        if [ -f /tmp/workspace-backup.tar.gz ]; then
+          echo "Restoring backup from Session 2..."
+          sudo tar -xzf /tmp/workspace-backup.tar.gz -C /home/Neotenet/
+          sudo rm /tmp/workspace-backup.tar.gz
+        elif [ -f workspace-backup.tar.gz ]; then
+          echo "Restoring initial backup from Repository file..."
+          sudo tar -xzf workspace-backup.tar.gz -C /home/Neotenet/
+        else
+          echo "No backup file found, starting with empty workspace."
+        fi
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace
+
+    - name: Connect Tailscale
+      env:
+        TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="session3-run-${{ github.run_id }}"
+        
+        echo "در حال تثبیت شبکه Tailscale..."
+        sleep 10
+        
+        TS_IP=$(tailscale ip -4)
+        echo "=========================================="
+        echo "SSH Connection Details (Session 3):"
+        echo "IP: $TS_IP"
+        echo "User: Neotenet"
+        echo "Password: neo_tenet"
+        echo "SSH Command: ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o StrictHostKeyChecking=no Neotenet@$TS_IP"
+        echo "To stop ALL sessions type: stop-all"
+        echo "To skip to NEXT session type: touch /tmp/skip_timer"
+        echo "=========================================="
+
+    - name: Keep Alive & Live Timer (5.5 Hours)
+      run: |
+        TOTAL_SECONDS=19800
+        while [ $TOTAL_SECONDS -gt 0 ]; do
+          if [ -f /tmp/skip_timer ]; then
+            echo -e "\nSkip signal received! Ending Session 3 and saving backup..."
+            sudo rm -f /tmp/skip_timer
+            break
+          fi
+          HOURS=$((TOTAL_SECONDS / 3600))
+          MINS=$(((TOTAL_SECONDS % 3600) / 60))
+          SECS=$((TOTAL_SECONDS % 60))
+          printf "\rTime remaining in Session 3: %02d:%02d:%02d" $HOURS $MINS $SECS
+          sleep 5
+          TOTAL_SECONDS=$((TOTAL_SECONDS - 5))
+        done
+
+    - name: Backup Workspace
+      if: always()
+      run: |
+        cd /home/Neotenet
+        sudo tar -czf /tmp/workspace-backup.tar.gz workspace/ || true
+
+    - name: Upload Workspace Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace-backup-s3
+        path: /tmp/workspace-backup.tar.gz
+        retention-days: 1
+
+    - name: Cleanup Tailscale Node
+      if: always()
+      run: |
+        sudo tailscale logout || true
+
+  session-4:
+    needs: session-3
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Up User
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        echo "runner:neo_tenet" | sudo chpasswd
+        sudo useradd -m -s /bin/bash Neotenet || true
+        echo "Neotenet:neo_tenet" | sudo chpasswd
+        sudo usermod -aG sudo Neotenet
+        sudo mkdir -p /home/Neotenet/workspace
+        echo "cd /home/Neotenet/workspace" | sudo tee -a /home/Neotenet/.bashrc > /dev/null
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace /home/Neotenet/.bashrc
+        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config || true
+        echo "PasswordAuthentication yes" | sudo tee /etc/ssh/sshd_config.d/99-password-auth.conf || true
+        sudo systemctl restart ssh || sudo service ssh restart || true
+
+        sudo bash -c "cat << 'EOF' > /usr/local/bin/stop-all
+        #!/bin/bash
+        echo 'Canceling all sessions and stopping workflow...'
+        curl -s -X POST -H 'Authorization: token $GH_TOKEN' -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/cancel'
+        sleep 4
+        sudo pkill -9 -f sleep || true
+        EOF"
+        sudo chmod +x /usr/local/bin/stop-all
+
+    - name: Download Workspace Artifact
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: workspace-backup-s3
+        path: /tmp/
+
+    - name: Restore Workspace Data
+      run: |
+        if [ -f /tmp/workspace-backup.tar.gz ]; then
+          echo "Restoring backup from Session 3..."
+          sudo tar -xzf /tmp/workspace-backup.tar.gz -C /home/Neotenet/
+          sudo rm /tmp/workspace-backup.tar.gz
+        elif [ -f workspace-backup.tar.gz ]; then
+          echo "Restoring initial backup from Repository file..."
+          sudo tar -xzf workspace-backup.tar.gz -C /home/Neotenet/
+        else
+          echo "No backup file found, starting with empty workspace."
+        fi
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace
+
+    - name: Connect Tailscale
+      env:
+        TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="session4-run-${{ github.run_id }}"
+        
+        echo "در حال تثبیت شبکه Tailscale..."
+        sleep 10
+        
+        TS_IP=$(tailscale ip -4)
+        echo "=========================================="
+        echo "SSH Connection Details (Session 4):"
+        echo "IP: $TS_IP"
+        echo "User: Neotenet"
+        echo "Password: neo_tenet"
+        echo "SSH Command: ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o StrictHostKeyChecking=no Neotenet@$TS_IP"
+        echo "To stop ALL sessions type: stop-all"
+        echo "To skip to NEXT session type: touch /tmp/skip_timer"
+        echo "=========================================="
+
+    - name: Keep Alive & Live Timer (5.5 Hours)
+      run: |
+        TOTAL_SECONDS=19800
+        while [ $TOTAL_SECONDS -gt 0 ]; do
+          if [ -f /tmp/skip_timer ]; then
+            echo -e "\nSkip signal received! Ending Session 4 and saving backup..."
+            sudo rm -f /tmp/skip_timer
+            break
+          fi
+          HOURS=$((TOTAL_SECONDS / 3600))
+          MINS=$(((TOTAL_SECONDS % 3600) / 60))
+          SECS=$((TOTAL_SECONDS % 60))
+          printf "\rTime remaining in Session 4: %02d:%02d:%02d" $HOURS $MINS $SECS
+          sleep 5
+          TOTAL_SECONDS=$((TOTAL_SECONDS - 5))
+        done
+
+    - name: Backup Workspace
+      if: always()
+      run: |
+        cd /home/Neotenet
+        sudo tar -czf /tmp/workspace-backup.tar.gz workspace/ || true
+
+    - name: Upload Workspace Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace-backup-s4
+        path: /tmp/workspace-backup.tar.gz
+        retention-days: 1
+
+    - name: Cleanup Tailscale Node
+      if: always()
+      run: |
+        sudo tailscale logout || true
+
+  session-5:
+    needs: session-4
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Up User
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        echo "runner:neo_tenet" | sudo chpasswd
+        sudo useradd -m -s /bin/bash Neotenet || true
+        echo "Neotenet:neo_tenet" | sudo chpasswd
+        sudo usermod -aG sudo Neotenet
+        sudo mkdir -p /home/Neotenet/workspace
+        echo "cd /home/Neotenet/workspace" | sudo tee -a /home/Neotenet/.bashrc > /dev/null
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace /home/Neotenet/.bashrc
+        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config || true
+        echo "PasswordAuthentication yes" | sudo tee /etc/ssh/sshd_config.d/99-password-auth.conf || true
+        sudo systemctl restart ssh || sudo service ssh restart || true
+
+        sudo bash -c "cat << 'EOF' > /usr/local/bin/stop-all
+        #!/bin/bash
+        echo 'Canceling all sessions and stopping workflow...'
+        curl -s -X POST -H 'Authorization: token $GH_TOKEN' -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/cancel'
+        sleep 4
+        sudo pkill -9 -f sleep || true
+        EOF"
+        sudo chmod +x /usr/local/bin/stop-all
+
+    - name: Download Workspace Artifact
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: workspace-backup-s4
+        path: /tmp/
+
+    - name: Restore Workspace Data
+      run: |
+        if [ -f /tmp/workspace-backup.tar.gz ]; then
+          echo "Restoring backup from Session 4..."
+          sudo tar -xzf /tmp/workspace-backup.tar.gz -C /home/Neotenet/
+          sudo rm /tmp/workspace-backup.tar.gz
+        elif [ -f workspace-backup.tar.gz ]; then
+          echo "Restoring initial backup from Repository file..."
+          sudo tar -xzf workspace-backup.tar.gz -C /home/Neotenet/
+        else
+          echo "No backup file found, starting with empty workspace."
+        fi
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace
+
+    - name: Connect Tailscale
+      env:
+        TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="session5-run-${{ github.run_id }}"
+        
+        echo "در حال تثبیت شبکه Tailscale..."
+        sleep 10
+        
+        TS_IP=$(tailscale ip -4)
+        echo "=========================================="
+        echo "SSH Connection Details (Session 5):"
+        echo "IP: $TS_IP"
+        echo "User: Neotenet"
+        echo "Password: neo_tenet"
+        echo "SSH Command: ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o StrictHostKeyChecking=no Neotenet@$TS_IP"
+        echo "To stop ALL sessions type: stop-all"
+        echo "To skip to NEXT session type: touch /tmp/skip_timer"
+        echo "=========================================="
+
+    - name: Keep Alive & Live Timer (5.5 Hours)
+      run: |
+        TOTAL_SECONDS=19800
+        while [ $TOTAL_SECONDS -gt 0 ]; do
+          if [ -f /tmp/skip_timer ]; then
+            echo -e "\nSkip signal received! Ending Session 5 and saving backup..."
+            sudo rm -f /tmp/skip_timer
+            break
+          fi
+          HOURS=$((TOTAL_SECONDS / 3600))
+          MINS=$(((TOTAL_SECONDS % 3600) / 60))
+          SECS=$((TOTAL_SECONDS % 60))
+          printf "\rTime remaining in Session 5: %02d:%02d:%02d" $HOURS $MINS $SECS
+          sleep 5
+          TOTAL_SECONDS=$((TOTAL_SECONDS - 5))
+        done
+
+    - name: Backup Workspace
+      if: always()
+      run: |
+        cd /home/Neotenet
+        sudo tar -czf /tmp/workspace-backup.tar.gz workspace/ || true
+
+    - name: Upload Workspace Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace-backup-s5
+        path: /tmp/workspace-backup.tar.gz
+        retention-days: 1
+
+    - name: Cleanup Tailscale Node
+      if: always()
+      run: |
+        sudo tailscale logout || true
+
+  session-6:
+    needs: session-5
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Up User
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_ID: ${{ github.run_id }}
+        REPO: ${{ github.repository }}
+      run: |
+        echo "runner:neo_tenet" | sudo chpasswd
+        sudo useradd -m -s /bin/bash Neotenet || true
+        echo "Neotenet:neo_tenet" | sudo chpasswd
+        sudo usermod -aG sudo Neotenet
+        sudo mkdir -p /home/Neotenet/workspace
+        echo "cd /home/Neotenet/workspace" | sudo tee -a /home/Neotenet/.bashrc > /dev/null
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace /home/Neotenet/.bashrc
+        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config || true
+        echo "PasswordAuthentication yes" | sudo tee /etc/ssh/sshd_config.d/99-password-auth.conf || true
+        sudo systemctl restart ssh || sudo service ssh restart || true
+
+        sudo bash -c "cat << 'EOF' > /usr/local/bin/stop-all
+        #!/bin/bash
+        echo 'Canceling all sessions and stopping workflow...'
+        curl -s -X POST -H 'Authorization: token $GH_TOKEN' -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/cancel'
+        sleep 4
+        sudo pkill -9 -f sleep || true
+        EOF"
+        sudo chmod +x /usr/local/bin/stop-all
+
+    - name: Download Workspace Artifact
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: workspace-backup-s5
+        path: /tmp/
+
+    - name: Restore Workspace Data
+      run: |
+        if [ -f /tmp/workspace-backup.tar.gz ]; then
+          echo "Restoring backup from Session 5..."
+          sudo tar -xzf /tmp/workspace-backup.tar.gz -C /home/Neotenet/
+          sudo rm /tmp/workspace-backup.tar.gz
+        elif [ -f workspace-backup.tar.gz ]; then
+          echo "Restoring initial backup from Repository file..."
+          sudo tar -xzf workspace-backup.tar.gz -C /home/Neotenet/
+        else
+          echo "No backup file found, starting with empty workspace."
+        fi
+        sudo chown -R Neotenet:Neotenet /home/Neotenet/workspace
+
+    - name: Connect Tailscale
+      env:
+        TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="session6-run-${{ github.run_id }}"
+        
+        echo "در حال تثبیت شبکه Tailscale..."
+        sleep 10
+        
+        TS_IP=$(tailscale ip -4)
+        echo "=========================================="
+        echo "SSH Connection Details (Session 6):"
+        echo "IP: $TS_IP"
+        echo "User: Neotenet"
+        echo "Password: neo_tenet"
+        echo "SSH Command: ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o StrictHostKeyChecking=no Neotenet@$TS_IP"
+        echo "To stop ALL sessions type: stop-all"
+        echo "To skip to NEXT session type: touch /tmp/skip_timer"
+        echo "=========================================="
+
+    - name: Keep Alive & Live Timer (5 Hours 50 Mins)
+      run: |
+        TOTAL_SECONDS=21000
+        while [ $TOTAL_SECONDS -gt 0 ]; do
+          if [ -f /tmp/skip_timer ]; then
+            echo -e "\nSkip signal received! Ending Session 6 and saving final backup..."
+            sudo rm -f /tmp/skip_timer
+            break
+          fi
+          HOURS=$((TOTAL_SECONDS / 3600))
+          MINS=$(((TOTAL_SECONDS % 3600) / 60))
+          SECS=$((TOTAL_SECONDS % 60))
+          printf "\rTime remaining in Session 6: %02d:%02d:%02d" $HOURS $MINS $SECS
+          sleep 5
+          TOTAL_SECONDS=$((TOTAL_SECONDS - 5))
+        done
+
+    - name: Backup Workspace
+      if: always()
+      run: |
+        cd /home/Neotenet
+        sudo tar -czf /tmp/workspace-backup.tar.gz workspace/ || true
+
+    - name: Upload Workspace Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: workspace-backup-s6
+        path: /tmp/workspace-backup.tar.gz
+        retention-days: 1
+
+    - name: Cleanup Tailscale Node
+      if: always()
+      run: |
+        sudo tailscale logout || true
